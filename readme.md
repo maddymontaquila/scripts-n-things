@@ -1,1 +1,3 @@
-`irm https://raw.githubusercontent.com/maddymontaquila/env-bootstrapper/main/windows.ps1 | iex`
+# Maddy's Scripts n' things
+
+Setup scripts, random skill.mds, oh my posh configs, etc
