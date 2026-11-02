@@ -60,6 +60,7 @@ function Mock-Setup {
     function global:Set-GitHubAccess { $script:actions += 'github-auth' }
     function global:Install-NodeWithFnm { $script:actions += 'node-fnm' }
     function global:Set-TerminalSettings { param($UseNerdFont) $script:actions += "terminal-font-$UseNerdFont" }
+    function global:Set-TaskbarPreferences { $script:actions += 'taskbar'; return $true }
     function global:Test-Path { param($Path) return $true }
     function global:New-Item { param($Path, [switch] $Force) }
     function global:New-ItemProperty { param($Path, $Name, $Value, $PropertyType, [switch] $Force) }
@@ -79,16 +80,19 @@ Test-Case 'Defaults include developer, messaging, Elgato, fnm and Terminal setup
         'Git.Git', 'GitHub.cli', 'GitHub.Copilot', 'GitHub.CopilotApp', 'Microsoft.Aspire',
         'Elgato.ControlCenter', 'Elgato.StreamDeck', 'Elgato.CameraHub',
         'OpenWhisperSystems.Signal', 'SlackTechnologies.Slack', 'Discord.Discord', 'Schniz.fnm',
-        '9PMX96TSF295', 'Microsoft.PowerToys', 'Audient.iD'
+        '9PMX96TSF295', 'Microsoft.PowerToys', 'Audient.iD', 'Logitech.OptionsPlus', '9NCBCSZSJRSB'
     )) {
         Assert-True ($id -in $script:installed) "Missing default package: $id"
     }
     Assert-True ('Docker.DockerDesktop' -notin $script:installed) 'Docker should be opt-in.'
+    Assert-True ('Microsoft.Office' -notin $script:installed) 'Office should be installed separately, not block setup.'
     Assert-True ('OpenJS.NodeJS.LTS' -notin $script:installed) 'Do not install standalone Node alongside fnm.'
     Assert-True ('Microsoft.Azure.DevCLI' -notin $script:installed) 'azd should be opt-in.'
     Assert-True ('Microsoft.AzureCLI' -in $script:installed) 'az should remain selected.'
     Assert-True ('github-auth' -notin $script:actions) 'GitHub login should be opt-in.'
+    Assert-True ('taskbar' -notin $script:actions) 'Taskbar changes should be opt-in.'
     Assert-True ($script:packageSources['9PMX96TSF295'] -eq 'msstore') 'Spend Tray must use the Microsoft Store source.'
+    Assert-True ($script:packageSources['9NCBCSZSJRSB'] -eq 'msstore') 'Spotify must use the Microsoft Store source.'
     Assert-True ($script:packageSources['Microsoft.PowerToys'] -eq 'winget') 'PowerToys should use the WinGet source.'
     Assert-True (($script:installed -like 'Microsoft.DotNet.SDK*').Count -eq 0) 'Do not install .NET through WinGet.'
     foreach ($action in @('dotnet10', 'prompt-font', 'wslc', 'node-fnm', 'terminal-font-True')) {
@@ -109,7 +113,7 @@ Test-Case 'Custom exact IDs can be added without restoring default selections' {
 }
 
 Test-Case 'Custom packages can be toggled off' {
-    Mock-Setup -Answers @('none', 'add', '7zip.7zip', '31', '')
+    Mock-Setup -Answers @('none', 'add', '7zip.7zip', '32', '')
     Start-WindowsSetup
     Assert-True ($script:installed.Count -eq 0) 'Deselected custom package was installed.'
 }
@@ -121,7 +125,7 @@ Test-Case 'Invalid IDs and menu numbers are rejected without changing selections
 }
 
 Test-Case 'Comma-separated toggles enable Docker and fnm' {
-    Mock-Setup -Answers @('none', '7,18', '', 'y')
+    Mock-Setup -Answers @('none', '7,17', '', 'y')
     Start-WindowsSetup
     Assert-True ($script:installed.Count -eq 2) 'Unexpected selection count.'
     Assert-True ('Docker.DockerDesktop' -in $script:installed) 'Docker was not selected.'
@@ -130,7 +134,7 @@ Test-Case 'Comma-separated toggles enable Docker and fnm' {
 }
 
 Test-Case 'Terminal configuration without Oh My Posh preserves font choice' {
-    Mock-Setup -Answers @('none', '27', '', 'y')
+    Mock-Setup -Answers @('none', '26', '', 'y')
     Start-WindowsSetup
     Assert-True ('terminal-font-False' -in $script:actions) 'Terminal should not select an uninstalled Nerd Font.'
 }
@@ -144,7 +148,7 @@ Test-Case 'Quit and declined confirmation make no changes' {
 }
 
 Test-Case 'GitHub authentication can be selected without treating it as a package' {
-    Mock-Setup -Answers @('none', '26', '', 'y')
+    Mock-Setup -Answers @('none', '25', '', 'y')
     Start-WindowsSetup
     Assert-True ($script:installed.Count -eq 0) 'Authentication was treated as a package.'
     Assert-True ('github-auth' -in $script:actions) 'Authentication step was skipped.'
@@ -161,6 +165,46 @@ Test-Case 'GitHub access uses browser login and a host-specific Git credential h
     Assert-True ('gh auth status --hostname github.com' -in $script:commands) 'Missing authentication verification.'
 }
 
+Test-Case 'Taskbar customization can be selected explicitly' {
+    Mock-Setup -Answers @('none', '19', '', 'y')
+    Start-WindowsSetup
+    Assert-True ('taskbar' -in $script:actions) 'Taskbar selection was ignored.'
+    Assert-True ($script:installed.Count -eq 0) 'Taskbar selection installed packages.'
+}
+
+Test-Case 'Taskbar permission denials are reported without failing other setup steps' {
+    Mock-Setup -Answers @('none', '19', '', 'y')
+    function global:Set-TaskbarPreferences { return $false }
+    $warnings = @()
+    Start-WindowsSetup -WarningVariable warnings
+    Assert-True (($warnings | Out-String) -like '*taskbar customization was not completed*') 'Missing incomplete-taskbar summary.'
+}
+
+Test-Case 'Taskbar helper reports permission errors but does not hide unrelated errors' {
+    function global:Test-Path { param($Path) return $true }
+    $script:taskbarWrites = @()
+    function global:New-ItemProperty {
+        param($Path, $Name, $Value, $PropertyType, [switch] $Force)
+        $script:taskbarWrites += $Name
+        if ($script:taskbarError) { throw $script:taskbarError }
+    }
+    $script:taskbarError = $null
+    Assert-True (Set-TaskbarPreferences) 'Writable taskbar settings did not complete.'
+    Assert-True ('TaskbarDa' -in $script:taskbarWrites -and 'SearchboxTaskbarMode' -in $script:taskbarWrites) 'Missing taskbar settings.'
+    foreach ($errorObject in @(
+        [System.UnauthorizedAccessException]::new('Access denied'),
+        [System.Security.SecurityException]::new('Requested registry access is not allowed')
+    )) {
+        $script:taskbarError = $errorObject
+        $warnings = @()
+        $applied = Set-TaskbarPreferences -WarningVariable warnings
+        Assert-True (!$applied) 'Permission denial was reported as success.'
+        Assert-True (($warnings | Out-String) -like '*Taskbar customization was not completed*') 'Permission failure was hidden.'
+    }
+    $script:taskbarError = [System.IO.IOException]::new('Unrelated registry failure')
+    Assert-Throws { Set-TaskbarPreferences } 'Unrelated registry failure'
+}
+
 Test-Case 'PowerShell dependency is checked before installations' {
     Mock-Setup -Answers @('1', '', 'y')
     function global:Get-Command {
@@ -175,6 +219,8 @@ Test-Case 'Native failures stop setup; already-current and reboot codes are hand
     function global:fake-native { $global:LASTEXITCODE = $script:nativeCode }
     $script:nativeCode = 42
     Assert-Throws { Invoke-Checked -Command fake-native } 'exit code 42'
+    $script:nativeCode = -1978335215
+    Assert-Throws { Invoke-Checked -Command fake-native } 'exit code -1978335215'
     $script:nativeCode = -1978335189
     Invoke-Checked -Command fake-native -SuccessCodes @(0, -1978335189)
     foreach ($code in @(3010, -1978334967)) {
@@ -285,7 +331,7 @@ Test-Case 'Prompt setup preserves an existing Unicode profile and does not dupli
         $content = [IO.File]::ReadAllText($script:testProfile)
         Assert-True ($content.StartsWith($existingContent)) 'Existing profile content was damaged.'
         Assert-True (([regex]::Matches($content, 'oh-my-posh init pwsh')).Count -eq 1) 'Duplicate prompt initialization.'
-        Assert-True ('oh-my-posh font install meslo' -in $script:commands) 'Nerd Font was not installed.'
+        Assert-True ('oh-my-posh font install FantasqueSansMono' -in $script:commands) 'Nerd Font was not installed.'
         Assert-True ($script:themeUri -eq 'https://raw.githubusercontent.com/maddymontaquila/scripts-n-things/main/terminal/madtheme.omp.json') 'Theme should come from this repository.'
     } finally { [IO.File]::Delete($script:testProfile) }
 }
@@ -334,12 +380,12 @@ Test-Case 'Terminal JSONC keeps settings, backs up the original, and updates the
 }
 '@
         [IO.File]::WriteAllText($path, $original)
-        Update-TerminalSettingsFile -Path $path -PowerShellPath 'C:\Program Files\PowerShell\7\pwsh.exe' -FontFace 'MesloLGM Nerd Font'
+        Update-TerminalSettingsFile -Path $path -PowerShellPath 'C:\Program Files\PowerShell\7\pwsh.exe' -FontFace 'FantasqueSansM Nerd Font'
         $settings = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
         Assert-True ($settings.defaultProfile -eq '{existing-pwsh}') 'Existing PowerShell profile was not reused.'
         Assert-True ($settings.theme -eq 'dark') 'Unrelated settings changed.'
         Assert-True ($settings.profiles.list.Count -eq 2) 'Extra profile created.'
-        Assert-True ($settings.profiles.list[0].font.face -eq 'MesloLGM Nerd Font') 'Font face was not configured.'
+        Assert-True ($settings.profiles.list[0].font.face -eq 'FantasqueSansM Nerd Font') 'Font face was not configured.'
         Assert-True ($settings.profiles.list[0].font.size -eq 16) 'Existing font size changed.'
         Assert-True ($settings.profiles.list[1].colorScheme -eq 'Campbell') 'Ubuntu settings changed.'
         $backups = @(Get-ChildItem -LiteralPath $directory -Filter 'settings.json.setup-backup-*')
@@ -348,7 +394,7 @@ Test-Case 'Terminal JSONC keeps settings, backs up the original, and updates the
         Update-TerminalSettingsFile -Path $path -PowerShellPath 'C:\Program Files\PowerShell\7\pwsh.exe'
         $settings = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
         Assert-True ($settings.profiles.list.Count -eq 2) 'Rerun duplicated profile.'
-        Assert-True ($settings.profiles.list[0].font.face -eq 'MesloLGM Nerd Font') 'Omitted font option changed the font.'
+        Assert-True ($settings.profiles.list[0].font.face -eq 'FantasqueSansM Nerd Font') 'Omitted font option changed the font.'
     }
 }
 
@@ -392,7 +438,7 @@ Test-Case 'Terminal wrapper runs the settings editor in a real PowerShell 7 proc
             Set-TerminalSettings -UseNerdFont $true
             $path = Join-Path $directory 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json'
             $settings = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
-            Assert-True ($settings.profiles.list[0].font.face -eq 'MesloLGM Nerd Font') 'Child process did not configure Terminal.'
+            Assert-True ($settings.profiles.list[0].font.face -eq 'FantasqueSansM Nerd Font') 'Child process did not configure Terminal.'
             $unpackagedPath = Join-Path $directory 'Microsoft\Windows Terminal\settings.json'
             [IO.Directory]::CreateDirectory((Split-Path -Parent $unpackagedPath)) | Out-Null
             [IO.File]::WriteAllText($unpackagedPath, '{}')

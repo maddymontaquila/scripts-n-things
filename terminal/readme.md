@@ -13,7 +13,17 @@ purple path/time, Git status, .NET SDK, and command-status segments and adds:
   outside matching project directories or when Node is unavailable.
 
 Use a current Oh My Posh release with Aspire segment support, the Aspire CLI,
-and Node via fnm. Meslo Nerd Font supplies the prompt icons.
+and Node via fnm. Fantasque Sans Mono Nerd Font supplies the prompt icons.
+
+To switch an existing installation without rerunning setup:
+
+```powershell
+oh-my-posh font install FantasqueSansMono
+```
+
+In Terminal > Settings > PowerShell > Appearance > Font face, select
+`FantasqueSansM Nerd Font` and save. This changes the font, not the purple theme
+or prompt layout.
 
 Setup downloads the theme from **this repository** into
 `$HOME\.mytheme.omp.json`, so existing PowerShell profile initialization continues

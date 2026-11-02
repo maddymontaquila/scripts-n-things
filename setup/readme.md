@@ -32,8 +32,8 @@ fix the reported issue and rerun, deselecting steps you no longer want.
 Defaults include PowerShell 7, .NET 10 via dotnetup, Git, GitHub CLI, GitHub
 Copilot CLI (`GitHub.Copilot`), the GitHub Copilot app (`GitHub.CopilotApp`),
 Windows Terminal, VS Code Insiders, Oh My Posh with the custom theme and
-Meslo Nerd Font, Azure CLI / VPN Client, Aspire CLI, Discord,
-Office, Edge Beta, WSL containers with Ubuntu, taskbar preferences, and Elgato
+Fantasque Nerd Font, Azure CLI / VPN Client, Aspire CLI, Discord,
+Edge Beta, WSL containers with Ubuntu, and Elgato
 Control Center / Stream Deck / Camera Hub. Signal and Slack are selected too;
 Discord remains selected.
 fnm with Node.js LTS and Terminal configuration are also selected by default.
@@ -41,7 +41,9 @@ PowerToys (`Microsoft.PowerToys`) and
 [GHCP Spend Tray](https://apps.microsoft.com/detail/9pmx96tsf295) are selected
 by default too. Spend Tray uses WinGet's `msstore` source and product ID
 `9PMX96TSF295`; it requires Microsoft Store access and may be restricted by
-organization policy. Other apps use the `winget` source. Launch Spend Tray
+organization policy. Spotify is also selected via the `msstore` source using
+product ID `9NCBCSZSJRSB`, avoiding the standalone installer's restriction on
+running as administrator. Other apps use the `winget` source. Launch Spend Tray
 after installation to finish its onboarding.
 Audient's iD driver/mixer (`Audient.iD`) is selected for the iD14 as well.
 The available WinGet manifest currently reports version `4.4.0.0` and points
@@ -50,13 +52,24 @@ guarantee of Audient's latest stable driver. For a stable-only installation,
 deselect it and use [Audient's downloads](https://audient.com/products/audio-interfaces/id14/downloads/).
 Open the iD app after installation to finish device setup and check firmware;
 restart Windows if requested. No separate EVO software is installed.
-**Docker Desktop and Azure Developer CLI (`azd`) are initially unchecked.**
+Logi Options+ (`Logitech.OptionsPlus`) is selected for the Logitech Lift mouse.
+Open it after installation to finish pairing and customize buttons/scrolling;
+the Lift uses Options+, not Logitech G HUB.
+**Docker Desktop, Azure Developer CLI (`azd`), and taskbar customization are initially unchecked.**
 Azure CLI (`az`) remains selected. Aspire CLI is
 installed through WinGet (`Microsoft.Aspire`), not its standalone install script.
 Existing installed apps are not bulk-upgraded.
 
+Office is intentionally not installed by this script: a WinGet installer
+checksum mismatch must not be bypassed or stop the rest of the machine setup.
+Install it separately from [Microsoft 365](https://www.microsoft365.com/) using
+your licensed account. If an earlier script stopped at Office, rerun the latest
+script; leave the unfinished shell/Terminal/WSL configuration steps selected.
+Installer hash errors do not identify their underlying cause by themselves;
+stale manifests, changed upstream downloads, or damaged downloads are possible.
+
 Oh My Posh styles the prompt; Nerd Fonts supply the icons. The Oh My Posh
-selection installs both the prompt tool and Meslo Nerd Font and configures the
+selection installs both the prompt tool and Fantasque Sans Mono Nerd Font and configures the
 custom prompt from this repository's
 [`terminal/madtheme.omp.json`](../terminal/madtheme.omp.json), not the old
 ohmyposh-config repository. It includes contextual Aspire AppHost/running status
@@ -66,8 +79,8 @@ selected, the font is applied to the PowerShell 7 profile automatically.
 ## Terminal settings
 
 The selected-by-default Terminal configuration step makes PowerShell 7 the
-default profile. If Oh My Posh/Meslo is also selected, it sets that profile's
-font to `MesloLGM Nerd Font`; otherwise it leaves the font unchanged.
+default profile. If Oh My Posh/Fantasque is also selected, it sets that profile's
+font to `FantasqueSansM Nerd Font`; otherwise it leaves the font unchanged.
 PowerShell 7 and Windows Terminal must be installed or selected.
 
 Existing stable packaged or unpackaged Terminal settings are updated; a fresh
@@ -191,11 +204,20 @@ If you selected Docker Desktop, launch it to complete its first-run setup.
 Installing Windows tools does not also provision their equivalents inside Ubuntu.
 
 In Windows Terminal's settings, choose the OS default terminal application.
-PowerShell 7 and Meslo are configured by the Terminal setup selection.
+PowerShell 7 and Fantasque are configured by the Terminal setup selection.
 The custom prompt and fnm initialization are added to the actual PowerShell 7
 current-user/all-hosts profile without duplicating them on reruns.
-Taskbar changes take effect after signing out or restarting; Explorer is not
-forcibly restarted.
+Taskbar customization is opt-in. If Windows denies registry access, setup
+reports that taskbar customization was not completed and continues to show
+the remaining first-run instructions. It does not change registry permissions
+or bypass organization restrictions. Use Windows Settings > Personalization >
+Taskbar where permitted instead. Some preferences may already have applied
+before a denial. Successful taskbar changes take effect after signing out or
+restarting; Explorer is not forcibly restarted.
+
+If an older run stopped at `New-ItemProperty` after WSL, the failing step was
+taskbar customization, not WSL installation. Earlier completed steps are not
+rolled back; there is no need to reinstall Ubuntu just for that error.
 
 Office licensing, Azure/GitHub authentication, VPN configuration, Git identity,
 editor extensions/settings sync, development certificates, Windows updates, and
