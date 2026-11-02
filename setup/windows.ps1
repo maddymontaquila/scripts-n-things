@@ -1,80 +1,256 @@
-# windows.ps1
-# Run as Administrator
+# Run in an elevated PowerShell window using your own Windows account.
+$ErrorActionPreference = 'Stop'
 
-# Ensure elevation
-if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
-    [Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-Host "`n❌ This script must be run as Administrator. Please right-click and choose 'Run as Administrator'." -ForegroundColor Red
-    Read-Host -Prompt "Press Enter to exit"
-    exit
+function Read-YesNo {
+    param([string] $Prompt, [bool] $Default = $true)
+
+    $hint = if ($Default) { 'Y/n' } else { 'y/N' }
+    while ($true) {
+        $answer = (Read-Host "$Prompt [$hint]").Trim()
+        if ($answer -eq '') { return $Default }
+        if ($answer -match '^(y|yes)$') { return $true }
+        if ($answer -match '^(n|no)$') { return $false }
+        Write-Warning 'Enter y or n.'
+    }
 }
 
-Write-Output "💻 Setting up your Windows dev machine..."
+function Invoke-Checked {
+    param(
+        [string] $Command,
+        [string[]] $Arguments = @(),
+        [int[]] $SuccessCodes = @(0),
+        [switch] $StopForReboot
+    )
 
-# Update Winget first
-Write-Output "⬆️ Updating Winget..."
-winget upgrade --all --silent
-
-Write-Host "🔄 Installing latest PowerShell..." -ForegroundColor Cyan
-winget install --id Microsoft.PowerShell --source winget --silent --accept-package-agreements --accept-source-agreements
-
-# Install essential dev tools
-$apps = @(
-    "Microsoft.DotNet.SDK.9",               # .NET SDK 9
-    "Docker.DockerDesktop",                 # Docker Desktop
-    "Microsoft.WindowsTerminal",           # Windows Terminal
-    "Microsoft.VisualStudioCode.Insiders", # VS Code Insiders
-    "JanDeDobbeleer.OhMyPosh",             # Oh My Posh
-    "Microsoft.AzureCLI",                  # Azure CLI
-    "Microsoft.AzureVPNClient",            # Azure VPN Client
-    "Microsoft.Azure.DevCLI",              # Azure Developer CLI
-    "Discord.Discord",                     # Discord
-    "Microsoft.Office"
-)
-
-foreach ($app in $apps) {
-    Write-Host "📦 Installing $app..." -ForegroundColor Green
-    winget install --id $app --silent --accept-source-agreements --accept-package-agreements
+    $PSNativeCommandUseErrorActionPreference = $false
+    & $Command @Arguments | Out-Host
+    $code = $LASTEXITCODE
+    if ($code -in @(3010, 1641, -1978334967, -1978334965)) {
+        $script:rebootRequired = $true
+        Write-Warning "$Command requires a Windows restart."
+        if ($StopForReboot) { throw 'Restart Windows and rerun setup to finish configuring WSL containers and Ubuntu.' }
+    } elseif ($code -notin $SuccessCodes) {
+        throw "$Command failed with exit code $code. Setup stopped; fix the error and rerun."
+    }
 }
 
-# Install WSL2 and Ubuntu
-Write-Host "🐧 Installing WSL2 and Ubuntu..." -ForegroundColor Cyan
-wsl --install -d Ubuntu
-
-# Download custom Oh My Posh theme
-Write-Host "🎨 Applying custom Oh My Posh theme..." -ForegroundColor Magenta
-$themeUrl = "https://raw.githubusercontent.com/maddymontaquila/ohmyposh-config/refs/heads/main/.mytheme.omp.json"
-$themePath = "$HOME\.mytheme.omp.json"
-Invoke-WebRequest -Uri $themeUrl -OutFile $themePath
-
-# Set up PowerShell profile
-$profilePath = "$HOME\Documents\PowerShell\Microsoft.PowerShell_profile.ps1"
-if (!(Test-Path $profilePath)) {
-    New-Item -ItemType File -Path $profilePath -Force | Out-Null
+function Update-SessionPath {
+    $env:PATH = @(
+        [Environment]::GetEnvironmentVariable('PATH', 'Machine')
+        [Environment]::GetEnvironmentVariable('PATH', 'User')
+        $env:PATH
+    ) -join ';'
 }
 
-$ompInit = "oh-my-posh init pwsh --config `"$themePath`" | Invoke-Expression"
-if (-not (Get-Content $profilePath | Select-String -SimpleMatch "oh-my-posh init pwsh")) {
-    Add-Content -Path $profilePath -Value $ompInit
-    Write-Host "✅ PowerShell profile updated with Oh My Posh theme." -ForegroundColor Green
+function Install-WinGetPackage {
+    param([string] $Id)
+
+    Write-Host "Installing $Id..." -ForegroundColor Green
+    # WinGet also returns UPDATE_NOT_APPLICABLE when the requested app is current.
+    Invoke-Checked -Command 'winget' -Arguments @(
+        'install', '--id', $Id, '--exact', '--source', 'winget', '--silent',
+        '--accept-source-agreements', '--accept-package-agreements', '--disable-interactivity'
+    ) -SuccessCodes @(0, -1978335189)
+    Update-SessionPath
 }
 
-Write-Host "🚀 Installing Aspire CLI..." -ForegroundColor Cyan
-Invoke-Expression "& { $(Invoke-RestMethod https://aspire.dev/install.ps1) }"
+function Install-DotNet10 {
+    Write-Host 'Installing .NET 10 with dotnetup (public preview)...' -ForegroundColor Cyan
+    $dotnetupDirectory = Join-Path $HOME '.dotnetup'
+    $dotnetup = Join-Path $dotnetupDirectory 'dotnetup.exe'
 
-Write-Host "📌 Setting Windows Terminal as default terminal app..." -ForegroundColor Cyan
-wt --set-default-terminal WindowsTerminal
+    if (!(Test-Path $dotnetup)) {
+        $installer = Join-Path ([IO.Path]::GetTempPath()) ("get-dotnetup-{0}.ps1" -f [guid]::NewGuid())
+        try {
+            Invoke-WebRequest -UseBasicParsing -Uri 'https://aka.ms/dotnetup/get-dotnetup.ps1' -OutFile $installer
+            # Isolate installer exit statements from the rest of this setup.
+            Invoke-Checked -Command (Get-Process -Id $PID).Path -Arguments @(
+                '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $installer, '-InstallDir', $dotnetupDirectory
+            )
+        } finally {
+            if (Test-Path $installer) { Remove-Item -LiteralPath $installer }
+        }
+    }
+    if (!(Test-Path $dotnetup)) { throw "dotnetup was not installed at $dotnetup." }
 
-Write-Host "🎛 Customizing Windows taskbar..." -ForegroundColor Cyan
+    Invoke-Checked -Command $dotnetup -Arguments @('sdk', 'install', '10', '--interactive', 'false')
+    Invoke-Checked -Command $dotnetup -Arguments @('env', 'set', 'shell', '--shell', 'pwsh')
+    $env:PATH = "$dotnetupDirectory;$env:PATH"
+    $sdks = & $dotnetup dotnet -- --list-sdks
+    if ($LASTEXITCODE -ne 0) { throw 'Could not list dotnetup-managed SDKs.' }
+    $sdks | Out-Host
+    if (!($sdks -match '^10\.\d+\.\d+\s')) { throw 'dotnetup did not report an installed .NET 10 SDK.' }
+}
 
-# Disable Widgets, use search icon only
-Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarDa" -Value 0
-Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -Name "SearchboxTaskbarMode" -Value 1
+function Install-WslContainers {
+    Install-WinGetPackage -Id 'Microsoft.WSL'
+    Invoke-Checked -Command 'wsl' -Arguments @('--install', '--no-distribution') -StopForReboot
+    Invoke-Checked -Command 'wsl' -Arguments @('--update')
+    $versionOutput = & wsl --version
+    if ($LASTEXITCODE -ne 0) { throw 'Could not check the WSL version. Restart Windows and rerun setup.' }
+    $versionText = ($versionOutput | Out-String).Replace("`0", '')
+    $versionMatch = [regex]::Match($versionText, '\d+\.\d+\.\d+(?:\.\d+)?')
+    if (!$versionMatch.Success -or [version] $versionMatch.Value -lt [version] '2.9.3') {
+        throw "WSL containers require WSL 2.9.3 or newer. Reported version: $versionText"
+    }
+    Update-SessionPath
+    Invoke-Checked -Command 'wslc' -Arguments @('--help')
 
-# Restart Explorer to apply changes
-Stop-Process -Name explorer -Force
-Start-Process explorer.exe
+    $distributions = & wsl --list --quiet
+    if ($LASTEXITCODE -ne 0) { throw 'Could not list WSL distributions. Restart Windows and rerun setup.' }
+    $distributionNames = @($distributions | ForEach-Object { $_.Replace("`0", '').Trim() })
+    if ('Ubuntu' -notin $distributionNames) {
+        Invoke-Checked -Command 'wsl' -Arguments @('--install', '-d', 'Ubuntu', '--no-launch')
+        $script:rebootRequired = $true
+        Write-Host 'After restarting, launch Ubuntu to finish creating your Linux user.'
+    }
+}
 
-Write-Host "✅ Windows UI cleanup complete." -ForegroundColor Green
+function Set-PoshProfile {
+    $pwsh = Get-Command pwsh -ErrorAction Stop
+    $profileOutput = & $pwsh.Source -NoProfile -Command '$PROFILE.CurrentUserAllHosts'
+    if ($LASTEXITCODE -ne 0) { throw 'Could not locate the PowerShell 7 profile.' }
+    $profilePath = ($profileOutput | Out-String).Trim()
+    if (!$profilePath) { throw 'PowerShell 7 returned an empty profile path.' }
 
-Write-Host "`n✅ Setup complete!" -ForegroundColor Cyan
+    $themePath = Join-Path $HOME '.mytheme.omp.json'
+    Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/maddymontaquila/ohmyposh-config/refs/heads/main/.mytheme.omp.json' -OutFile $themePath
+    if (!(Test-Path $profilePath)) {
+        New-Item -ItemType File -Path $profilePath -Force | Out-Null
+    }
+    $ompInit = "oh-my-posh init pwsh --config '$($themePath.Replace("'", "''"))' | Invoke-Expression"
+    $profileContent = [IO.File]::ReadAllText($profilePath)
+    if (!$profileContent.Contains('oh-my-posh init pwsh')) {
+        Set-Content -LiteralPath $profilePath -Value "$profileContent`n$ompInit" -Encoding UTF8
+    }
+    Invoke-Checked -Command 'oh-my-posh' -Arguments @('font', 'install', 'meslo')
+    Write-Host 'In Terminal settings, select the installed Meslo Nerd Font for your PowerShell profile.'
+}
+
+function Test-SetupAdministrator {
+    return ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
+        [Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+function Start-WindowsSetup {
+    if (!(Test-SetupAdministrator)) {
+        throw 'Run this script in an elevated PowerShell window using your own Windows account.'
+    }
+
+    $script:rebootRequired = $false
+    $options = @(
+        [pscustomobject]@{ Name = 'PowerShell 7'; Id = 'Microsoft.PowerShell'; Selected = $true }
+        [pscustomobject]@{ Name = '.NET 10 SDK via dotnetup (preview)'; Id = 'dotnetup'; Selected = $true }
+        [pscustomobject]@{ Name = 'Git'; Id = 'Git.Git'; Selected = $true }
+        [pscustomobject]@{ Name = 'GitHub CLI'; Id = 'GitHub.cli'; Selected = $true }
+        [pscustomobject]@{ Name = 'GitHub Copilot CLI'; Id = 'GitHub.Copilot'; Selected = $true }
+        [pscustomobject]@{ Name = 'GitHub Copilot app'; Id = 'GitHub.CopilotApp'; Selected = $true }
+        [pscustomobject]@{ Name = 'Docker Desktop'; Id = 'Docker.DockerDesktop'; Selected = $false }
+        [pscustomobject]@{ Name = 'Windows Terminal'; Id = 'Microsoft.WindowsTerminal'; Selected = $true }
+        [pscustomobject]@{ Name = 'VS Code Insiders'; Id = 'Microsoft.VisualStudioCode.Insiders'; Selected = $true }
+        [pscustomobject]@{ Name = 'Oh My Posh + prompt + Meslo Nerd Font'; Id = 'JanDeDobbeleer.OhMyPosh'; Selected = $true }
+        [pscustomobject]@{ Name = 'Azure CLI'; Id = 'Microsoft.AzureCLI'; Selected = $true }
+        [pscustomobject]@{ Name = 'Azure VPN Client'; Id = 'Microsoft.AzureVPNClient'; Selected = $true }
+        [pscustomobject]@{ Name = 'Azure Developer CLI'; Id = 'Microsoft.Azure.DevCLI'; Selected = $true }
+        [pscustomobject]@{ Name = 'Aspire CLI'; Id = 'Microsoft.Aspire'; Selected = $true }
+        [pscustomobject]@{ Name = 'Discord'; Id = 'Discord.Discord'; Selected = $true }
+        [pscustomobject]@{ Name = 'Microsoft Office'; Id = 'Microsoft.Office'; Selected = $true }
+        [pscustomobject]@{ Name = 'Microsoft Edge Beta'; Id = 'Microsoft.Edge.Beta'; Selected = $true }
+        [pscustomobject]@{ Name = 'Node.js LTS'; Id = 'OpenJS.NodeJS.LTS'; Selected = $false }
+        [pscustomobject]@{ Name = 'WSL containers (wslc) + Ubuntu (restart may be needed)'; Id = 'wsl'; Selected = $true }
+        [pscustomobject]@{ Name = 'Hide Widgets and use taskbar search icon'; Id = 'taskbar'; Selected = $true }
+        [pscustomobject]@{ Name = 'Elgato Control Center'; Id = 'Elgato.ControlCenter'; Selected = $true }
+        [pscustomobject]@{ Name = 'Elgato Stream Deck'; Id = 'Elgato.StreamDeck'; Selected = $true }
+        [pscustomobject]@{ Name = 'Elgato Camera Hub'; Id = 'Elgato.CameraHub'; Selected = $true }
+    )
+
+    Write-Host 'Select your Windows setup. Nothing is installed until you confirm.' -ForegroundColor Cyan
+    Write-Host 'Removing an item from this list skips it; it does not uninstall existing software.'
+    while ($true) {
+        for ($i = 0; $i -lt $options.Count; $i++) {
+            $mark = if ($options[$i].Selected) { 'x' } else { ' ' }
+            Write-Host ('{0,2}. [{1}] {2}' -f ($i + 1), $mark, $options[$i].Name)
+        }
+        $answer = (Read-Host 'Toggle numbers (e.g. 3,8), all, none, add, q to quit, or Enter to continue').Trim()
+        if ($answer -eq '') { break }
+        if ($answer -eq 'q') { return }
+        if ($answer -in @('all', 'none')) {
+            foreach ($option in $options) { $option.Selected = ($answer -eq 'all') }
+        } elseif ($answer -eq 'add') {
+            $id = (Read-Host 'Exact WinGet package ID (e.g. Microsoft.PowerToys)').Trim()
+            if ($id -notmatch '^[A-Za-z0-9][A-Za-z0-9._+-]*\.[A-Za-z0-9._+-]+$') {
+                Write-Warning 'Enter an exact WinGet package ID, not a command or app display name.'
+            } elseif ($id -in $options.Id) {
+                Write-Warning 'That package is already in the list; toggle its number instead.'
+            } else {
+                $options += [pscustomobject]@{ Name = $id; Id = $id; Selected = $true }
+            }
+        } else {
+            $numbers = @($answer -split '[,\s]+' | Where-Object { $_ -ne '' })
+            $indices = @()
+            foreach ($number in $numbers) {
+                $index = 0
+                if (![int]::TryParse($number, [ref] $index) -or $index -lt 1 -or $index -gt $options.Count) {
+                    $indices = @()
+                    Write-Warning 'Enter numbers from the list.'
+                    break
+                }
+                $indices += $index - 1
+            }
+            foreach ($index in ($indices | Select-Object -Unique)) {
+                $options[$index].Selected = !$options[$index].Selected
+            }
+        }
+    }
+
+    $selected = @($options | Where-Object Selected)
+    if ($selected.Count -eq 0) {
+        Write-Host 'Nothing selected. No changes made.'
+        return
+    }
+    if (!(Read-YesNo "Apply these $($selected.Count) selections?")) { return }
+
+    $packageOptions = @($selected | Where-Object { $_.Id -notin @('dotnetup', 'wsl', 'taskbar') })
+    if (($packageOptions.Count -gt 0 -or 'wsl' -in $selected.Id) -and !(Get-Command winget -ErrorAction SilentlyContinue)) {
+        throw 'WinGet is unavailable. Install/update App Installer from Microsoft Store, open a new terminal, and rerun.'
+    }
+    if (('JanDeDobbeleer.OhMyPosh' -in $selected.Id -or 'dotnetup' -in $selected.Id -or 'GitHub.Copilot' -in $selected.Id) -and
+        'Microsoft.PowerShell' -notin $selected.Id -and !(Get-Command pwsh -ErrorAction SilentlyContinue)) {
+        throw 'The custom prompt, dotnetup shell configuration, and Copilot CLI require PowerShell 7. Select it in the menu or install it first.'
+    }
+
+    foreach ($option in $packageOptions) {
+        Install-WinGetPackage -Id $option.Id
+    }
+    if ('dotnetup' -in $selected.Id) { Install-DotNet10 }
+    if ('JanDeDobbeleer.OhMyPosh' -in $selected.Id) { Set-PoshProfile }
+
+    if ('wsl' -in $selected.Id) { Install-WslContainers }
+    if ('taskbar' -in $selected.Id) {
+        $advancedKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+        $searchKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Search'
+        foreach ($key in @($advancedKey, $searchKey)) {
+            if (!(Test-Path $key)) { New-Item -Path $key -Force | Out-Null }
+        }
+        New-ItemProperty -Path $advancedKey -Name TaskbarDa -Value 0 -PropertyType DWord -Force | Out-Null
+        New-ItemProperty -Path $searchKey -Name SearchboxTaskbarMode -Value 1 -PropertyType DWord -Force | Out-Null
+        Write-Host 'Taskbar settings saved. Sign out or restart Windows to apply them.'
+    }
+
+    Write-Host 'Selected setup steps completed. Open a new terminal before using installed tools.' -ForegroundColor Green
+    if ($script:rebootRequired) { Write-Warning 'Restart Windows before using WSL / Docker.' }
+    if ('Microsoft.WindowsTerminal' -in $selected.Id) {
+        Write-Host 'Terminal > Settings > Startup: choose your default terminal application and PowerShell 7 profile.'
+    }
+    if ('Docker.DockerDesktop' -in $selected.Id) {
+        Write-Host 'Launch Docker Desktop to finish setup and enable Ubuntu integration if wanted.'
+    }
+    if ('GitHub.Copilot' -in $selected.Id -or 'GitHub.CopilotApp' -in $selected.Id) {
+        Write-Host 'Launch copilot and the GitHub Copilot app to sign in. Organization policies may govern access.'
+    }
+    if ('dotnetup' -in $selected.Id) {
+        Write-Host '.NET 10 is managed by dotnetup in PowerShell 7 shell mode, not installed machine-wide.'
+    }
+}
+
+Start-WindowsSetup
