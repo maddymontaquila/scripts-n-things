@@ -21,7 +21,7 @@ The menu shows the selected defaults before making changes:
 
 - Enter numbers separated by commas or spaces to toggle items.
 - Enter `all` or `none` to select or clear everything.
-- Enter `add` to add an exact WinGet package ID, such as `Microsoft.PowerToys`.
+- Enter `add` to add an exact WinGet package ID, such as `7zip.7zip`.
   Use `winget search <name>` to find IDs. Added packages can be toggled too.
 - Press Enter to review the selection count and confirm, or `q` to quit.
 
@@ -37,6 +37,19 @@ Office, Edge Beta, WSL containers with Ubuntu, taskbar preferences, and Elgato
 Control Center / Stream Deck / Camera Hub. Signal and Slack are selected too;
 Discord remains selected.
 fnm with Node.js LTS and Terminal configuration are also selected by default.
+PowerToys (`Microsoft.PowerToys`) and
+[GHCP Spend Tray](https://apps.microsoft.com/detail/9pmx96tsf295) are selected
+by default too. Spend Tray uses WinGet's `msstore` source and product ID
+`9PMX96TSF295`; it requires Microsoft Store access and may be restricted by
+organization policy. Other apps use the `winget` source. Launch Spend Tray
+after installation to finish its onboarding.
+Audient's iD driver/mixer (`Audient.iD`) is selected for the iD14 as well.
+The available WinGet manifest currently reports version `4.4.0.0` and points
+to `iD-v4.4.2b6.exe`; this is the explicitly chosen WinGet package, not a
+guarantee of Audient's latest stable driver. For a stable-only installation,
+deselect it and use [Audient's downloads](https://audient.com/products/audio-interfaces/id14/downloads/).
+Open the iD app after installation to finish device setup and check firmware;
+restart Windows if requested. No separate EVO software is installed.
 **Docker Desktop and Azure Developer CLI (`azd`) are initially unchecked.**
 Azure CLI (`az`) remains selected. Aspire CLI is
 installed through WinGet (`Microsoft.Aspire`), not its standalone install script.
@@ -44,8 +57,11 @@ Existing installed apps are not bulk-upgraded.
 
 Oh My Posh styles the prompt; Nerd Fonts supply the icons. The Oh My Posh
 selection installs both the prompt tool and Meslo Nerd Font and configures the
-custom prompt. With Terminal configuration selected, that font is applied to
-the PowerShell 7 profile automatically.
+custom prompt from this repository's
+[`terminal/madtheme.omp.json`](../terminal/madtheme.omp.json), not the old
+ohmyposh-config repository. It includes contextual Aspire AppHost/running status
+and the active Node version in Node projects. With Terminal configuration
+selected, the font is applied to the PowerShell 7 profile automatically.
 
 ## Terminal settings
 

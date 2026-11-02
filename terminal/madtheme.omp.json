@@ -63,6 +63,43 @@
           "type": "dotnet",
           "style": "powerline",
           "powerline_symbol": "\ue0b0"
+        },
+        {
+          "options": {
+            "fetch_running": true
+          },
+          "template": " \uf423 {{ .Name }}{{ if .Running }} \uf00c{{ end }} ",
+          "foreground": "#EFDCF9",
+          "background": "#69307A",
+          "type": "aspire",
+          "style": "powerline",
+          "powerline_symbol": "\ue0b0"
+        },
+        {
+          "options": {
+            "cache_duration": "none",
+            "display_mode": "files",
+            "extensions": [
+              "*.js",
+              "*.jsx",
+              "*.mjs",
+              "*.cjs",
+              "*.ts",
+              "*.tsx",
+              "package.json",
+              ".node-version",
+              ".nvmrc",
+              "pnpm-workspace.yaml",
+              ".pnpmfile.cjs",
+              "*.vue"
+            ]
+          },
+          "template": " \ue718 {{ .Full }} ",
+          "foreground": "#EFDCF9",
+          "background": "#4c1f5e",
+          "type": "node",
+          "style": "powerline",
+          "powerline_symbol": "\ue0b0"
         }
       ],
       "newline": true

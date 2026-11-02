@@ -16,6 +16,7 @@ function Reset-SetupFunctions {
         Invoke-Expression "function global:$($definition.Name) $($definition.Body.Extent.Text)"
     }
     $script:installed = @()
+    $script:packageSources = @{}
     $script:actions = @()
     $script:answers = [Collections.Generic.Queue[string]]::new()
     $script:commands = @()
@@ -49,8 +50,9 @@ function Mock-Setup {
         return [pscustomobject]@{ Source = $Name }
     }
     function global:Install-WinGetPackage {
-        param($Id)
+        param($Id, $Source = 'winget')
         $script:installed += $Id
+        $script:packageSources[$Id] = $Source
     }
     function global:Install-DotNet10 { $script:actions += 'dotnet10' }
     function global:Set-PoshProfile { $script:actions += 'prompt-font' }
@@ -76,7 +78,8 @@ Test-Case 'Defaults include developer, messaging, Elgato, fnm and Terminal setup
     foreach ($id in @(
         'Git.Git', 'GitHub.cli', 'GitHub.Copilot', 'GitHub.CopilotApp', 'Microsoft.Aspire',
         'Elgato.ControlCenter', 'Elgato.StreamDeck', 'Elgato.CameraHub',
-        'OpenWhisperSystems.Signal', 'SlackTechnologies.Slack', 'Discord.Discord', 'Schniz.fnm'
+        'OpenWhisperSystems.Signal', 'SlackTechnologies.Slack', 'Discord.Discord', 'Schniz.fnm',
+        '9PMX96TSF295', 'Microsoft.PowerToys', 'Audient.iD'
     )) {
         Assert-True ($id -in $script:installed) "Missing default package: $id"
     }
@@ -85,6 +88,8 @@ Test-Case 'Defaults include developer, messaging, Elgato, fnm and Terminal setup
     Assert-True ('Microsoft.Azure.DevCLI' -notin $script:installed) 'azd should be opt-in.'
     Assert-True ('Microsoft.AzureCLI' -in $script:installed) 'az should remain selected.'
     Assert-True ('github-auth' -notin $script:actions) 'GitHub login should be opt-in.'
+    Assert-True ($script:packageSources['9PMX96TSF295'] -eq 'msstore') 'Spend Tray must use the Microsoft Store source.'
+    Assert-True ($script:packageSources['Microsoft.PowerToys'] -eq 'winget') 'PowerToys should use the WinGet source.'
     Assert-True (($script:installed -like 'Microsoft.DotNet.SDK*').Count -eq 0) 'Do not install .NET through WinGet.'
     foreach ($action in @('dotnet10', 'prompt-font', 'wslc', 'node-fnm', 'terminal-font-True')) {
         Assert-True ($action -in $script:actions) "Missing default action: $action"
@@ -98,13 +103,13 @@ Test-Case 'An empty selection makes no changes' {
 }
 
 Test-Case 'Custom exact IDs can be added without restoring default selections' {
-    Mock-Setup -Answers @('none', 'add', 'Microsoft.PowerToys', '', 'yes')
+    Mock-Setup -Answers @('none', 'add', '7zip.7zip', '', 'yes')
     Start-WindowsSetup
-    Assert-True ($script:installed.Count -eq 1 -and $script:installed[0] -eq 'Microsoft.PowerToys') 'Wrong custom selection.'
+    Assert-True ($script:installed.Count -eq 1 -and $script:installed[0] -eq '7zip.7zip') 'Wrong custom selection.'
 }
 
 Test-Case 'Custom packages can be toggled off' {
-    Mock-Setup -Answers @('none', 'add', 'Microsoft.PowerToys', '28', '')
+    Mock-Setup -Answers @('none', 'add', '7zip.7zip', '31', '')
     Start-WindowsSetup
     Assert-True ($script:installed.Count -eq 0) 'Deselected custom package was installed.'
 }
@@ -195,6 +200,10 @@ Test-Case 'WinGet uses exact IDs and explicit source, including for Aspire' {
     Assert-True ($call.Command -eq 'winget') 'Expected WinGet.'
     Assert-True ('Microsoft.Aspire' -in $call.Arguments -and '--exact' -in $call.Arguments) 'Missing exact Aspire ID.'
     Assert-True ('--source' -in $call.Arguments -and 'winget' -in $call.Arguments) 'Missing source.'
+    Install-WinGetPackage -Id 9PMX96TSF295 -Source msstore
+    $storeCall = $script:commands[1]
+    Assert-True ('9PMX96TSF295' -in $storeCall.Arguments -and '--exact' -in $storeCall.Arguments) 'Missing exact Store product ID.'
+    Assert-True ($storeCall.Arguments[$storeCall.Arguments.IndexOf('--source') + 1] -eq 'msstore') 'Wrong Store source.'
 }
 
 Test-Case 'dotnetup installs channel 10, configures pwsh shell mode, and verifies SDKs' {
@@ -262,7 +271,10 @@ Test-Case 'Prompt setup preserves an existing Unicode profile and does not dupli
         $global:LASTEXITCODE = 0
         return $script:testProfile
     }
-    function global:Invoke-WebRequest { param($Uri, $OutFile, [switch] $UseBasicParsing) }
+    function global:Invoke-WebRequest {
+        param($Uri, $OutFile, [switch] $UseBasicParsing)
+        $script:themeUri = $Uri
+    }
     function global:Invoke-Checked {
         param($Command, $Arguments)
         $script:commands += "$Command $($Arguments -join ' ')"
@@ -274,6 +286,7 @@ Test-Case 'Prompt setup preserves an existing Unicode profile and does not dupli
         Assert-True ($content.StartsWith($existingContent)) 'Existing profile content was damaged.'
         Assert-True (([regex]::Matches($content, 'oh-my-posh init pwsh')).Count -eq 1) 'Duplicate prompt initialization.'
         Assert-True ('oh-my-posh font install meslo' -in $script:commands) 'Nerd Font was not installed.'
+        Assert-True ($script:themeUri -eq 'https://raw.githubusercontent.com/maddymontaquila/scripts-n-things/main/terminal/madtheme.omp.json') 'Theme should come from this repository.'
     } finally { [IO.File]::Delete($script:testProfile) }
 }
 
