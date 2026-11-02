@@ -160,7 +160,7 @@ function Start-WindowsSetup {
         [pscustomobject]@{ Name = 'Oh My Posh + prompt + Meslo Nerd Font'; Id = 'JanDeDobbeleer.OhMyPosh'; Selected = $true }
         [pscustomobject]@{ Name = 'Azure CLI'; Id = 'Microsoft.AzureCLI'; Selected = $true }
         [pscustomobject]@{ Name = 'Azure VPN Client'; Id = 'Microsoft.AzureVPNClient'; Selected = $true }
-        [pscustomobject]@{ Name = 'Azure Developer CLI'; Id = 'Microsoft.Azure.DevCLI'; Selected = $true }
+        [pscustomobject]@{ Name = 'Azure Developer CLI'; Id = 'Microsoft.Azure.DevCLI'; Selected = $false }
         [pscustomobject]@{ Name = 'Aspire CLI'; Id = 'Microsoft.Aspire'; Selected = $true }
         [pscustomobject]@{ Name = 'Discord'; Id = 'Discord.Discord'; Selected = $true }
         [pscustomobject]@{ Name = 'Microsoft Office'; Id = 'Microsoft.Office'; Selected = $true }

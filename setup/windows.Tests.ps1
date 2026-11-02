@@ -80,6 +80,8 @@ Test-Case 'Defaults include Git, gh, both Copilots, Aspire and Elgato apps; Dock
     }
     Assert-True ('Docker.DockerDesktop' -notin $script:installed) 'Docker should be opt-in.'
     Assert-True ('OpenJS.NodeJS.LTS' -notin $script:installed) 'Node should be opt-in.'
+    Assert-True ('Microsoft.Azure.DevCLI' -notin $script:installed) 'azd should be opt-in.'
+    Assert-True ('Microsoft.AzureCLI' -in $script:installed) 'az should remain selected.'
     Assert-True ('github-auth' -notin $script:actions) 'GitHub login should be opt-in.'
     Assert-True (($script:installed -like 'Microsoft.DotNet.SDK*').Count -eq 0) 'Do not install .NET through WinGet.'
     foreach ($action in @('dotnet10', 'prompt-font', 'wslc')) {

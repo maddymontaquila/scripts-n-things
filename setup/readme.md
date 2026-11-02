@@ -32,11 +32,12 @@ fix the reported issue and rerun, deselecting steps you no longer want.
 Defaults include PowerShell 7, .NET 10 via dotnetup, Git, GitHub CLI, GitHub
 Copilot CLI (`GitHub.Copilot`), the GitHub Copilot app (`GitHub.CopilotApp`),
 Windows Terminal, VS Code Insiders, Oh My Posh with the custom theme and
-Meslo Nerd Font, Azure CLI / VPN Client / Developer CLI, Aspire CLI, Discord,
+Meslo Nerd Font, Azure CLI / VPN Client, Aspire CLI, Discord,
 Office, Edge Beta, WSL containers with Ubuntu, taskbar preferences, and Elgato
 Control Center / Stream Deck / Camera Hub. Signal and Slack are selected too;
 Discord remains selected.
-**Docker Desktop and Node.js LTS are initially unchecked.** Aspire CLI is
+**Docker Desktop, Node.js LTS, and Azure Developer CLI (`azd`) are initially unchecked.**
+Azure CLI (`az`) remains selected. Aspire CLI is
 installed through WinGet (`Microsoft.Aspire`), not its standalone install script.
 Existing installed apps are not bulk-upgraded.
 
