@@ -267,6 +267,7 @@ function Start-WindowsSetup {
         [pscustomobject]@{ Name = 'GHCP Spend Tray (Microsoft Store)'; Id = '9PMX96TSF295'; Source = 'msstore'; Selected = $true }
         [pscustomobject]@{ Name = 'Microsoft PowerToys'; Id = 'Microsoft.PowerToys'; Selected = $true }
         [pscustomobject]@{ Name = 'Audient iD driver + mixer (iD14)'; Id = 'Audient.iD'; Selected = $true }
+        [pscustomobject]@{ Name = 'Logi Options+ (Lift mouse)'; Id = 'Logitech.OptionsPlus'; Selected = $true }
     )
 
     Write-Host 'Select your Windows setup. Nothing is installed until you confirm.' -ForegroundColor Cyan

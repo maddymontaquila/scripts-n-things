@@ -79,7 +79,7 @@ Test-Case 'Defaults include developer, messaging, Elgato, fnm and Terminal setup
         'Git.Git', 'GitHub.cli', 'GitHub.Copilot', 'GitHub.CopilotApp', 'Microsoft.Aspire',
         'Elgato.ControlCenter', 'Elgato.StreamDeck', 'Elgato.CameraHub',
         'OpenWhisperSystems.Signal', 'SlackTechnologies.Slack', 'Discord.Discord', 'Schniz.fnm',
-        '9PMX96TSF295', 'Microsoft.PowerToys', 'Audient.iD'
+        '9PMX96TSF295', 'Microsoft.PowerToys', 'Audient.iD', 'Logitech.OptionsPlus'
     )) {
         Assert-True ($id -in $script:installed) "Missing default package: $id"
     }
@@ -110,7 +110,7 @@ Test-Case 'Custom exact IDs can be added without restoring default selections' {
 }
 
 Test-Case 'Custom packages can be toggled off' {
-    Mock-Setup -Answers @('none', 'add', '7zip.7zip', '30', '')
+    Mock-Setup -Answers @('none', 'add', '7zip.7zip', '31', '')
     Start-WindowsSetup
     Assert-True ($script:installed.Count -eq 0) 'Deselected custom package was installed.'
 }

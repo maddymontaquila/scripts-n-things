@@ -50,6 +50,9 @@ guarantee of Audient's latest stable driver. For a stable-only installation,
 deselect it and use [Audient's downloads](https://audient.com/products/audio-interfaces/id14/downloads/).
 Open the iD app after installation to finish device setup and check firmware;
 restart Windows if requested. No separate EVO software is installed.
+Logi Options+ (`Logitech.OptionsPlus`) is selected for the Logitech Lift mouse.
+Open it after installation to finish pairing and customize buttons/scrolling;
+the Lift uses Options+, not Logitech G HUB.
 **Docker Desktop and Azure Developer CLI (`azd`) are initially unchecked.**
 Azure CLI (`az`) remains selected. Aspire CLI is
 installed through WinGet (`Microsoft.Aspire`), not its standalone install script.
