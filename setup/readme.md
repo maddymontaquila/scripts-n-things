@@ -21,7 +21,7 @@ The menu shows the selected defaults before making changes:
 
 - Enter numbers separated by commas or spaces to toggle items.
 - Enter `all` or `none` to select or clear everything.
-- Enter `add` to add an exact WinGet package ID, such as `Microsoft.PowerToys`.
+- Enter `add` to add an exact WinGet package ID, such as `7zip.7zip`.
   Use `winget search <name>` to find IDs. Added packages can be toggled too.
 - Press Enter to review the selection count and confirm, or `q` to quit.
 
@@ -37,6 +37,12 @@ Office, Edge Beta, WSL containers with Ubuntu, taskbar preferences, and Elgato
 Control Center / Stream Deck / Camera Hub. Signal and Slack are selected too;
 Discord remains selected.
 fnm with Node.js LTS and Terminal configuration are also selected by default.
+PowerToys (`Microsoft.PowerToys`) and
+[GHCP Spend Tray](https://apps.microsoft.com/detail/9pmx96tsf295) are selected
+by default too. Spend Tray uses WinGet's `msstore` source and product ID
+`9PMX96TSF295`; it requires Microsoft Store access and may be restricted by
+organization policy. Other apps use the `winget` source. Launch Spend Tray
+after installation to finish its onboarding.
 **Docker Desktop and Azure Developer CLI (`azd`) are initially unchecked.**
 Azure CLI (`az`) remains selected. Aspire CLI is
 installed through WinGet (`Microsoft.Aspire`), not its standalone install script.

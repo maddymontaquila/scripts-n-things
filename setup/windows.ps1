@@ -43,12 +43,16 @@ function Update-SessionPath {
 }
 
 function Install-WinGetPackage {
-    param([string] $Id)
+    param(
+        [string] $Id,
+        [ValidateSet('winget', 'msstore')]
+        [string] $Source = 'winget'
+    )
 
     Write-Host "Installing $Id..." -ForegroundColor Green
     # WinGet also returns UPDATE_NOT_APPLICABLE when the requested app is current.
     Invoke-Checked -Command 'winget' -Arguments @(
-        'install', '--id', $Id, '--exact', '--source', 'winget', '--silent',
+        'install', '--id', $Id, '--exact', '--source', $Source, '--silent',
         '--accept-source-agreements', '--accept-package-agreements', '--disable-interactivity'
     ) -SuccessCodes @(0, -1978335189)
     Update-SessionPath
@@ -261,6 +265,8 @@ function Start-WindowsSetup {
         [pscustomobject]@{ Name = 'Slack'; Id = 'SlackTechnologies.Slack'; Selected = $true }
         [pscustomobject]@{ Name = 'GitHub browser sign-in + HTTPS Git credentials (interactive)'; Id = 'github-auth'; Selected = $false }
         [pscustomobject]@{ Name = 'Terminal: PowerShell 7 default profile + Nerd Font if selected'; Id = 'terminal-settings'; Selected = $true }
+        [pscustomobject]@{ Name = 'GHCP Spend Tray (Microsoft Store)'; Id = '9PMX96TSF295'; Source = 'msstore'; Selected = $true }
+        [pscustomobject]@{ Name = 'Microsoft PowerToys'; Id = 'Microsoft.PowerToys'; Selected = $true }
     )
 
     Write-Host 'Select your Windows setup. Nothing is installed until you confirm.' -ForegroundColor Cyan
@@ -276,7 +282,7 @@ function Start-WindowsSetup {
         if ($answer -in @('all', 'none')) {
             foreach ($option in $options) { $option.Selected = ($answer -eq 'all') }
         } elseif ($answer -eq 'add') {
-            $id = (Read-Host 'Exact WinGet package ID (e.g. Microsoft.PowerToys)').Trim()
+            $id = (Read-Host 'Exact WinGet package ID (e.g. 7zip.7zip)').Trim()
             if ($id -notmatch '^[A-Za-z0-9][A-Za-z0-9._+-]*\.[A-Za-z0-9._+-]+$') {
                 Write-Warning 'Enter an exact WinGet package ID, not a command or app display name.'
             } elseif ($id -in $options.Id) {
@@ -333,7 +339,9 @@ function Start-WindowsSetup {
     }
 
     foreach ($option in $packageOptions) {
-        Install-WinGetPackage -Id $option.Id
+        $installParameters = @{ Id = $option.Id }
+        if ($option.PSObject.Properties['Source']) { $installParameters.Source = $option.Source }
+        Install-WinGetPackage @installParameters
     }
     if ('dotnetup' -in $selected.Id) { Install-DotNet10 }
     if ('JanDeDobbeleer.OhMyPosh' -in $selected.Id) { Set-PoshProfile }
