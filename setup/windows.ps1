@@ -126,7 +126,7 @@ function Add-PowerShellProfileLine {
 
 function Set-PoshProfile {
     $themePath = Join-Path $HOME '.mytheme.omp.json'
-    Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/maddymontaquila/ohmyposh-config/refs/heads/main/.mytheme.omp.json' -OutFile $themePath
+    Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/maddymontaquila/scripts-n-things/main/terminal/madtheme.omp.json' -OutFile $themePath
     $ompInit = "oh-my-posh init pwsh --config '$($themePath.Replace("'", "''"))' | Invoke-Expression"
     Add-PowerShellProfileLine -Line $ompInit -Marker 'oh-my-posh init pwsh'
     Invoke-Checked -Command 'oh-my-posh' -Arguments @('font', 'install', 'meslo')

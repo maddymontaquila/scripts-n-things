@@ -44,8 +44,11 @@ Existing installed apps are not bulk-upgraded.
 
 Oh My Posh styles the prompt; Nerd Fonts supply the icons. The Oh My Posh
 selection installs both the prompt tool and Meslo Nerd Font and configures the
-custom prompt. With Terminal configuration selected, that font is applied to
-the PowerShell 7 profile automatically.
+custom prompt from this repository's
+[`terminal/madtheme.omp.json`](../terminal/madtheme.omp.json), not the old
+ohmyposh-config repository. It includes contextual Aspire AppHost/running status
+and the active Node version in Node projects. With Terminal configuration
+selected, the font is applied to the PowerShell 7 profile automatically.
 
 ## Terminal settings
 

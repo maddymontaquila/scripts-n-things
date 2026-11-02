@@ -262,7 +262,10 @@ Test-Case 'Prompt setup preserves an existing Unicode profile and does not dupli
         $global:LASTEXITCODE = 0
         return $script:testProfile
     }
-    function global:Invoke-WebRequest { param($Uri, $OutFile, [switch] $UseBasicParsing) }
+    function global:Invoke-WebRequest {
+        param($Uri, $OutFile, [switch] $UseBasicParsing)
+        $script:themeUri = $Uri
+    }
     function global:Invoke-Checked {
         param($Command, $Arguments)
         $script:commands += "$Command $($Arguments -join ' ')"
@@ -274,6 +277,7 @@ Test-Case 'Prompt setup preserves an existing Unicode profile and does not dupli
         Assert-True ($content.StartsWith($existingContent)) 'Existing profile content was damaged.'
         Assert-True (([regex]::Matches($content, 'oh-my-posh init pwsh')).Count -eq 1) 'Duplicate prompt initialization.'
         Assert-True ('oh-my-posh font install meslo' -in $script:commands) 'Nerd Font was not installed.'
+        Assert-True ($script:themeUri -eq 'https://raw.githubusercontent.com/maddymontaquila/scripts-n-things/main/terminal/madtheme.omp.json') 'Theme should come from this repository.'
     } finally { [IO.File]::Delete($script:testProfile) }
 }
 
