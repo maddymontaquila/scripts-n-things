@@ -55,6 +55,7 @@ function Mock-Setup {
     function global:Install-DotNet10 { $script:actions += 'dotnet10' }
     function global:Set-PoshProfile { $script:actions += 'prompt-font' }
     function global:Install-WslContainers { $script:actions += 'wslc' }
+    function global:Set-GitHubAccess { $script:actions += 'github-auth' }
     function global:Test-Path { param($Path) return $true }
     function global:New-Item { param($Path, [switch] $Force) }
     function global:New-ItemProperty { param($Path, $Name, $Value, $PropertyType, [switch] $Force) }
@@ -72,12 +73,14 @@ Test-Case 'Defaults include Git, gh, both Copilots, Aspire and Elgato apps; Dock
     Start-WindowsSetup
     foreach ($id in @(
         'Git.Git', 'GitHub.cli', 'GitHub.Copilot', 'GitHub.CopilotApp', 'Microsoft.Aspire',
-        'Elgato.ControlCenter', 'Elgato.StreamDeck', 'Elgato.CameraHub'
+        'Elgato.ControlCenter', 'Elgato.StreamDeck', 'Elgato.CameraHub',
+        'OpenWhisperSystems.Signal', 'SlackTechnologies.Slack', 'Discord.Discord'
     )) {
         Assert-True ($id -in $script:installed) "Missing default package: $id"
     }
     Assert-True ('Docker.DockerDesktop' -notin $script:installed) 'Docker should be opt-in.'
     Assert-True ('OpenJS.NodeJS.LTS' -notin $script:installed) 'Node should be opt-in.'
+    Assert-True ('github-auth' -notin $script:actions) 'GitHub login should be opt-in.'
     Assert-True (($script:installed -like 'Microsoft.DotNet.SDK*').Count -eq 0) 'Do not install .NET through WinGet.'
     foreach ($action in @('dotnet10', 'prompt-font', 'wslc')) {
         Assert-True ($action -in $script:actions) "Missing default action: $action"
@@ -97,7 +100,7 @@ Test-Case 'Custom exact IDs can be added without restoring default selections' {
 }
 
 Test-Case 'Custom packages can be toggled off' {
-    Mock-Setup -Answers @('none', 'add', 'Microsoft.PowerToys', '24', '')
+    Mock-Setup -Answers @('none', 'add', 'Microsoft.PowerToys', '27', '')
     Start-WindowsSetup
     Assert-True ($script:installed.Count -eq 0) 'Deselected custom package was installed.'
 }
@@ -122,6 +125,24 @@ Test-Case 'Quit and declined confirmation make no changes' {
         Start-WindowsSetup
     }
     Assert-True ($script:installed.Count -eq 0) 'Cancellation installed packages.'
+}
+
+Test-Case 'GitHub authentication can be selected without treating it as a package' {
+    Mock-Setup -Answers @('none', '26', '', 'y')
+    Start-WindowsSetup
+    Assert-True ($script:installed.Count -eq 0) 'Authentication was treated as a package.'
+    Assert-True ('github-auth' -in $script:actions) 'Authentication step was skipped.'
+}
+
+Test-Case 'GitHub access uses browser login and a host-specific Git credential helper' {
+    function global:Invoke-Checked {
+        param($Command, $Arguments)
+        $script:commands += "$Command $($Arguments -join ' ')"
+    }
+    Set-GitHubAccess
+    Assert-True ('gh auth login --hostname github.com --git-protocol https --web' -in $script:commands) 'Missing browser login.'
+    Assert-True ('gh auth setup-git --hostname github.com' -in $script:commands) 'Missing Git credential configuration.'
+    Assert-True ('gh auth status --hostname github.com' -in $script:commands) 'Missing authentication verification.'
 }
 
 Test-Case 'PowerShell dependency is checked before installations' {

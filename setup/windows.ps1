@@ -132,6 +132,15 @@ function Test-SetupAdministrator {
         [Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
+function Set-GitHubAccess {
+    Write-Host 'Complete GitHub sign-in in your browser, including your organization SSO if prompted.' -ForegroundColor Cyan
+    Invoke-Checked -Command 'gh' -Arguments @('auth', 'login', '--hostname', 'github.com', '--git-protocol', 'https', '--web')
+    Invoke-Checked -Command 'gh' -Arguments @('auth', 'setup-git', '--hostname', 'github.com')
+    Invoke-Checked -Command 'gh' -Arguments @('auth', 'status', '--hostname', 'github.com')
+    Write-Host 'Org access still requires membership, SSO authorization, and any organization approval/device requirements.'
+    Write-Host 'Visit https://github.com/orgs/YOUR-ORG/sso, then verify access with: gh repo view YOUR-ORG/PRIVATE-REPO'
+}
+
 function Start-WindowsSetup {
     if (!(Test-SetupAdministrator)) {
         throw 'Run this script in an elevated PowerShell window using your own Windows account.'
@@ -162,6 +171,9 @@ function Start-WindowsSetup {
         [pscustomobject]@{ Name = 'Elgato Control Center'; Id = 'Elgato.ControlCenter'; Selected = $true }
         [pscustomobject]@{ Name = 'Elgato Stream Deck'; Id = 'Elgato.StreamDeck'; Selected = $true }
         [pscustomobject]@{ Name = 'Elgato Camera Hub'; Id = 'Elgato.CameraHub'; Selected = $true }
+        [pscustomobject]@{ Name = 'Signal'; Id = 'OpenWhisperSystems.Signal'; Selected = $true }
+        [pscustomobject]@{ Name = 'Slack'; Id = 'SlackTechnologies.Slack'; Selected = $true }
+        [pscustomobject]@{ Name = 'GitHub browser sign-in + HTTPS Git credentials (interactive)'; Id = 'github-auth'; Selected = $false }
     )
 
     Write-Host 'Select your Windows setup. Nothing is installed until you confirm.' -ForegroundColor Cyan
@@ -210,7 +222,7 @@ function Start-WindowsSetup {
     }
     if (!(Read-YesNo "Apply these $($selected.Count) selections?")) { return }
 
-    $packageOptions = @($selected | Where-Object { $_.Id -notin @('dotnetup', 'wsl', 'taskbar') })
+    $packageOptions = @($selected | Where-Object { $_.Id -notin @('dotnetup', 'wsl', 'taskbar', 'github-auth') })
     if (($packageOptions.Count -gt 0 -or 'wsl' -in $selected.Id) -and !(Get-Command winget -ErrorAction SilentlyContinue)) {
         throw 'WinGet is unavailable. Install/update App Installer from Microsoft Store, open a new terminal, and rerun.'
     }
@@ -218,12 +230,23 @@ function Start-WindowsSetup {
         'Microsoft.PowerShell' -notin $selected.Id -and !(Get-Command pwsh -ErrorAction SilentlyContinue)) {
         throw 'The custom prompt, dotnetup shell configuration, and Copilot CLI require PowerShell 7. Select it in the menu or install it first.'
     }
+    if ('github-auth' -in $selected.Id) {
+        foreach ($dependency in @(
+            @{ Id = 'Git.Git'; Command = 'git' },
+            @{ Id = 'GitHub.cli'; Command = 'gh' }
+        )) {
+            if ($dependency.Id -notin $selected.Id -and !(Get-Command $dependency.Command -ErrorAction SilentlyContinue)) {
+                throw "GitHub sign-in requires $($dependency.Id). Select it in the menu or install it first."
+            }
+        }
+    }
 
     foreach ($option in $packageOptions) {
         Install-WinGetPackage -Id $option.Id
     }
     if ('dotnetup' -in $selected.Id) { Install-DotNet10 }
     if ('JanDeDobbeleer.OhMyPosh' -in $selected.Id) { Set-PoshProfile }
+    if ('github-auth' -in $selected.Id) { Set-GitHubAccess }
 
     if ('wsl' -in $selected.Id) { Install-WslContainers }
     if ('taskbar' -in $selected.Id) {
@@ -247,6 +270,10 @@ function Start-WindowsSetup {
     }
     if ('GitHub.Copilot' -in $selected.Id -or 'GitHub.CopilotApp' -in $selected.Id) {
         Write-Host 'Launch copilot and the GitHub Copilot app to sign in. Organization policies may govern access.'
+    }
+    if ('GitHub.cli' -in $selected.Id -and 'github-auth' -notin $selected.Id) {
+        Write-Host 'GitHub org access: run gh auth login --hostname github.com --git-protocol https --web, then gh auth setup-git --hostname github.com.'
+        Write-Host 'Complete organization SSO/approval and verify a private repo. See setup/readme.md for the checklist.'
     }
     if ('dotnetup' -in $selected.Id) {
         Write-Host '.NET 10 is managed by dotnetup in PowerShell 7 shell mode, not installed machine-wide.'

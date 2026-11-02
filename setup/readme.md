@@ -34,7 +34,8 @@ Copilot CLI (`GitHub.Copilot`), the GitHub Copilot app (`GitHub.CopilotApp`),
 Windows Terminal, VS Code Insiders, Oh My Posh with the custom theme and
 Meslo Nerd Font, Azure CLI / VPN Client / Developer CLI, Aspire CLI, Discord,
 Office, Edge Beta, WSL containers with Ubuntu, taskbar preferences, and Elgato
-Control Center / Stream Deck / Camera Hub.
+Control Center / Stream Deck / Camera Hub. Signal and Slack are selected too;
+Discord remains selected.
 **Docker Desktop and Node.js LTS are initially unchecked.** Aspire CLI is
 installed through WinGet (`Microsoft.Aspire`), not its standalone install script.
 Existing installed apps are not bulk-upgraded.
@@ -42,6 +43,41 @@ Existing installed apps are not bulk-upgraded.
 Oh My Posh styles the prompt; Nerd Fonts supply the icons. The Oh My Posh
 selection installs both the prompt tool and Meslo Nerd Font and configures the
 custom prompt. You still need to choose the font in Terminal settings.
+
+## GitHub organization access
+
+The **GitHub browser sign-in + HTTPS Git credentials** menu item is opt-in.
+It requires Git and GitHub CLI (both selected by default), opens browser/device
+authentication, configures Git to use `gh` as its HTTPS credential helper for
+github.com, and checks login status. It does not create SSH keys or ask you to
+paste tokens into this script. You can also run it later:
+
+```powershell
+gh auth login --hostname github.com --git-protocol https --web
+gh auth setup-git --hostname github.com
+gh auth status --hostname github.com
+```
+
+Installing software or logging in does **not** grant organization membership.
+Finish these steps as required by your organization:
+
+- Accept invitations and enable the required 2FA/passkey.
+- Visit `https://github.com/orgs/YOUR-ORG/sso` and sign in through the identity
+  provider. Authorize GitHub CLI's OAuth access to the organization; request
+  administrator approval if the organization restricts OAuth apps.
+- Verify actual private-repository access with
+  `gh repo view YOUR-ORG/PRIVATE-REPO`. Login status alone does not verify SSO.
+  If authorization is missing, establish the browser SSO session and rerun
+  `gh auth login --hostname github.com --git-protocol https --web`.
+- Complete any company device enrollment, VPN/IP allowlist, and conditional
+  access requirements using your organization's instructions. There is no
+  universal GitHub organization-access app to install.
+
+Git for Windows and `gh` cover the HTTPS workflow; no separate SSH setup is
+needed unless you prefer SSH. Set your Git commit name/email separately using
+your approved identity. Copilot CLI/app sign-in and organization Copilot policies
+are separate. For GitHub Enterprise hosts, use the actual hostname instead of
+`github.com` in the commands above.
 
 ## WSL containers
 
