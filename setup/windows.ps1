@@ -253,7 +253,6 @@ function Start-WindowsSetup {
         [pscustomobject]@{ Name = 'Azure Developer CLI'; Id = 'Microsoft.Azure.DevCLI'; Selected = $false }
         [pscustomobject]@{ Name = 'Aspire CLI'; Id = 'Microsoft.Aspire'; Selected = $true }
         [pscustomobject]@{ Name = 'Discord'; Id = 'Discord.Discord'; Selected = $true }
-        [pscustomobject]@{ Name = 'Microsoft Office'; Id = 'Microsoft.Office'; Selected = $true }
         [pscustomobject]@{ Name = 'Microsoft Edge Beta'; Id = 'Microsoft.Edge.Beta'; Selected = $true }
         [pscustomobject]@{ Name = 'fnm + Node.js LTS + automatic project version switching'; Id = 'Schniz.fnm'; Selected = $true }
         [pscustomobject]@{ Name = 'WSL containers (wslc) + Ubuntu (restart may be needed)'; Id = 'wsl'; Selected = $true }
@@ -365,6 +364,7 @@ function Start-WindowsSetup {
     }
 
     Write-Host 'Selected setup steps completed. Open a new terminal before using installed tools.' -ForegroundColor Green
+    Write-Host 'Install Office separately from https://www.microsoft365.com/ using your licensed account.'
     if ($script:rebootRequired) { Write-Warning 'Restart Windows before using WSL / Docker.' }
     if ('Microsoft.WindowsTerminal' -in $selected.Id) {
         Write-Host 'Terminal > Settings > Startup: choose Windows Terminal as the OS default terminal application.'

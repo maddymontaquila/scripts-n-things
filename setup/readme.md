@@ -33,7 +33,7 @@ Defaults include PowerShell 7, .NET 10 via dotnetup, Git, GitHub CLI, GitHub
 Copilot CLI (`GitHub.Copilot`), the GitHub Copilot app (`GitHub.CopilotApp`),
 Windows Terminal, VS Code Insiders, Oh My Posh with the custom theme and
 Meslo Nerd Font, Azure CLI / VPN Client, Aspire CLI, Discord,
-Office, Edge Beta, WSL containers with Ubuntu, taskbar preferences, and Elgato
+Edge Beta, WSL containers with Ubuntu, taskbar preferences, and Elgato
 Control Center / Stream Deck / Camera Hub. Signal and Slack are selected too;
 Discord remains selected.
 fnm with Node.js LTS and Terminal configuration are also selected by default.
@@ -54,6 +54,14 @@ restart Windows if requested. No separate EVO software is installed.
 Azure CLI (`az`) remains selected. Aspire CLI is
 installed through WinGet (`Microsoft.Aspire`), not its standalone install script.
 Existing installed apps are not bulk-upgraded.
+
+Office is intentionally not installed by this script: a WinGet installer
+checksum mismatch must not be bypassed or stop the rest of the machine setup.
+Install it separately from [Microsoft 365](https://www.microsoft365.com/) using
+your licensed account. If an earlier script stopped at Office, rerun the latest
+script; leave the unfinished shell/Terminal/WSL configuration steps selected.
+Installer hash errors do not identify their underlying cause by themselves;
+stale manifests, changed upstream downloads, or damaged downloads are possible.
 
 Oh My Posh styles the prompt; Nerd Fonts supply the icons. The Oh My Posh
 selection installs both the prompt tool and Meslo Nerd Font and configures the

@@ -84,6 +84,7 @@ Test-Case 'Defaults include developer, messaging, Elgato, fnm and Terminal setup
         Assert-True ($id -in $script:installed) "Missing default package: $id"
     }
     Assert-True ('Docker.DockerDesktop' -notin $script:installed) 'Docker should be opt-in.'
+    Assert-True ('Microsoft.Office' -notin $script:installed) 'Office should be installed separately, not block setup.'
     Assert-True ('OpenJS.NodeJS.LTS' -notin $script:installed) 'Do not install standalone Node alongside fnm.'
     Assert-True ('Microsoft.Azure.DevCLI' -notin $script:installed) 'azd should be opt-in.'
     Assert-True ('Microsoft.AzureCLI' -in $script:installed) 'az should remain selected.'
@@ -109,7 +110,7 @@ Test-Case 'Custom exact IDs can be added without restoring default selections' {
 }
 
 Test-Case 'Custom packages can be toggled off' {
-    Mock-Setup -Answers @('none', 'add', '7zip.7zip', '31', '')
+    Mock-Setup -Answers @('none', 'add', '7zip.7zip', '30', '')
     Start-WindowsSetup
     Assert-True ($script:installed.Count -eq 0) 'Deselected custom package was installed.'
 }
@@ -121,7 +122,7 @@ Test-Case 'Invalid IDs and menu numbers are rejected without changing selections
 }
 
 Test-Case 'Comma-separated toggles enable Docker and fnm' {
-    Mock-Setup -Answers @('none', '7,18', '', 'y')
+    Mock-Setup -Answers @('none', '7,17', '', 'y')
     Start-WindowsSetup
     Assert-True ($script:installed.Count -eq 2) 'Unexpected selection count.'
     Assert-True ('Docker.DockerDesktop' -in $script:installed) 'Docker was not selected.'
@@ -130,7 +131,7 @@ Test-Case 'Comma-separated toggles enable Docker and fnm' {
 }
 
 Test-Case 'Terminal configuration without Oh My Posh preserves font choice' {
-    Mock-Setup -Answers @('none', '27', '', 'y')
+    Mock-Setup -Answers @('none', '26', '', 'y')
     Start-WindowsSetup
     Assert-True ('terminal-font-False' -in $script:actions) 'Terminal should not select an uninstalled Nerd Font.'
 }
@@ -144,7 +145,7 @@ Test-Case 'Quit and declined confirmation make no changes' {
 }
 
 Test-Case 'GitHub authentication can be selected without treating it as a package' {
-    Mock-Setup -Answers @('none', '26', '', 'y')
+    Mock-Setup -Answers @('none', '25', '', 'y')
     Start-WindowsSetup
     Assert-True ($script:installed.Count -eq 0) 'Authentication was treated as a package.'
     Assert-True ('github-auth' -in $script:actions) 'Authentication step was skipped.'
@@ -175,6 +176,8 @@ Test-Case 'Native failures stop setup; already-current and reboot codes are hand
     function global:fake-native { $global:LASTEXITCODE = $script:nativeCode }
     $script:nativeCode = 42
     Assert-Throws { Invoke-Checked -Command fake-native } 'exit code 42'
+    $script:nativeCode = -1978335215
+    Assert-Throws { Invoke-Checked -Command fake-native } 'exit code -1978335215'
     $script:nativeCode = -1978335189
     Invoke-Checked -Command fake-native -SuccessCodes @(0, -1978335189)
     foreach ($code in @(3010, -1978334967)) {
