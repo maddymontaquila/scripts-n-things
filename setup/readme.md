@@ -33,7 +33,7 @@ Defaults include PowerShell 7, .NET 10 via dotnetup, Git, GitHub CLI, GitHub
 Copilot CLI (`GitHub.Copilot`), the GitHub Copilot app (`GitHub.CopilotApp`),
 Windows Terminal, VS Code Insiders, Oh My Posh with the custom theme and
 Meslo Nerd Font, Azure CLI / VPN Client, Aspire CLI, Discord,
-Edge Beta, WSL containers with Ubuntu, taskbar preferences, and Elgato
+Edge Beta, WSL containers with Ubuntu, and Elgato
 Control Center / Stream Deck / Camera Hub. Signal and Slack are selected too;
 Discord remains selected.
 fnm with Node.js LTS and Terminal configuration are also selected by default.
@@ -55,7 +55,7 @@ restart Windows if requested. No separate EVO software is installed.
 Logi Options+ (`Logitech.OptionsPlus`) is selected for the Logitech Lift mouse.
 Open it after installation to finish pairing and customize buttons/scrolling;
 the Lift uses Options+, not Logitech G HUB.
-**Docker Desktop and Azure Developer CLI (`azd`) are initially unchecked.**
+**Docker Desktop, Azure Developer CLI (`azd`), and taskbar customization are initially unchecked.**
 Azure CLI (`az`) remains selected. Aspire CLI is
 installed through WinGet (`Microsoft.Aspire`), not its standalone install script.
 Existing installed apps are not bulk-upgraded.
@@ -207,8 +207,17 @@ In Windows Terminal's settings, choose the OS default terminal application.
 PowerShell 7 and Meslo are configured by the Terminal setup selection.
 The custom prompt and fnm initialization are added to the actual PowerShell 7
 current-user/all-hosts profile without duplicating them on reruns.
-Taskbar changes take effect after signing out or restarting; Explorer is not
-forcibly restarted.
+Taskbar customization is opt-in. If Windows denies registry access, setup
+reports that taskbar customization was not completed and continues to show
+the remaining first-run instructions. It does not change registry permissions
+or bypass organization restrictions. Use Windows Settings > Personalization >
+Taskbar where permitted instead. Some preferences may already have applied
+before a denial. Successful taskbar changes take effect after signing out or
+restarting; Explorer is not forcibly restarted.
+
+If an older run stopped at `New-ItemProperty` after WSL, the failing step was
+taskbar customization, not WSL installation. Earlier completed steps are not
+rolled back; there is no need to reinstall Ubuntu just for that error.
 
 Office licensing, Azure/GitHub authentication, VPN configuration, Git identity,
 editor extensions/settings sync, development certificates, Windows updates, and

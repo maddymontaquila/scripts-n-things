@@ -231,7 +231,31 @@ function Set-GitHubAccess {
     Write-Host 'Visit https://github.com/orgs/YOUR-ORG/sso, then verify access with: gh repo view YOUR-ORG/PRIVATE-REPO'
 }
 
+function Set-TaskbarPreferences {
+    [CmdletBinding()]
+    param()
+
+    try {
+        $advancedKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+        $searchKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Search'
+        foreach ($key in @($advancedKey, $searchKey)) {
+            if (!(Test-Path $key)) { New-Item -Path $key -Force | Out-Null }
+        }
+        New-ItemProperty -Path $advancedKey -Name TaskbarDa -Value 0 -PropertyType DWord -Force | Out-Null
+        New-ItemProperty -Path $searchKey -Name SearchboxTaskbarMode -Value 1 -PropertyType DWord -Force | Out-Null
+        Write-Host 'Taskbar settings saved. Sign out or restart Windows to apply them.'
+        return $true
+    } catch [System.UnauthorizedAccessException], [System.Security.SecurityException] {
+        Write-Warning "Taskbar customization was not completed: $($_.Exception.Message)"
+        Write-Warning 'Some taskbar changes may already have applied. Use Windows Settings > Personalization > Taskbar where permitted. Registry permissions were not changed.'
+        return $false
+    }
+}
+
 function Start-WindowsSetup {
+    [CmdletBinding()]
+    param()
+
     if (!(Test-SetupAdministrator)) {
         throw 'Run this script in an elevated PowerShell window using your own Windows account.'
     }
@@ -256,7 +280,7 @@ function Start-WindowsSetup {
         [pscustomobject]@{ Name = 'Microsoft Edge Beta'; Id = 'Microsoft.Edge.Beta'; Selected = $true }
         [pscustomobject]@{ Name = 'fnm + Node.js LTS + automatic project version switching'; Id = 'Schniz.fnm'; Selected = $true }
         [pscustomobject]@{ Name = 'WSL containers (wslc) + Ubuntu (restart may be needed)'; Id = 'wsl'; Selected = $true }
-        [pscustomobject]@{ Name = 'Hide Widgets and use taskbar search icon'; Id = 'taskbar'; Selected = $true }
+        [pscustomobject]@{ Name = 'Hide Widgets and use taskbar search icon (optional)'; Id = 'taskbar'; Selected = $false }
         [pscustomobject]@{ Name = 'Elgato Control Center'; Id = 'Elgato.ControlCenter'; Selected = $true }
         [pscustomobject]@{ Name = 'Elgato Stream Deck'; Id = 'Elgato.StreamDeck'; Selected = $true }
         [pscustomobject]@{ Name = 'Elgato Camera Hub'; Id = 'Elgato.CameraHub'; Selected = $true }
@@ -354,18 +378,16 @@ function Start-WindowsSetup {
     if ('github-auth' -in $selected.Id) { Set-GitHubAccess }
 
     if ('wsl' -in $selected.Id) { Install-WslContainers }
+    $taskbarApplied = $true
     if ('taskbar' -in $selected.Id) {
-        $advancedKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
-        $searchKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Search'
-        foreach ($key in @($advancedKey, $searchKey)) {
-            if (!(Test-Path $key)) { New-Item -Path $key -Force | Out-Null }
-        }
-        New-ItemProperty -Path $advancedKey -Name TaskbarDa -Value 0 -PropertyType DWord -Force | Out-Null
-        New-ItemProperty -Path $searchKey -Name SearchboxTaskbarMode -Value 1 -PropertyType DWord -Force | Out-Null
-        Write-Host 'Taskbar settings saved. Sign out or restart Windows to apply them.'
+        $taskbarApplied = Set-TaskbarPreferences
     }
 
-    Write-Host 'Selected setup steps completed. Open a new terminal before using installed tools.' -ForegroundColor Green
+    if ($taskbarApplied) {
+        Write-Host 'Selected setup steps completed. Open a new terminal before using installed tools.' -ForegroundColor Green
+    } else {
+        Write-Warning 'Other selected setup steps completed, but taskbar customization was not completed. Open a new terminal before using installed tools.'
+    }
     Write-Host 'Install Office separately from https://www.microsoft365.com/ using your licensed account.'
     if ($script:rebootRequired) { Write-Warning 'Restart Windows before using WSL / Docker.' }
     if ('Microsoft.WindowsTerminal' -in $selected.Id) {

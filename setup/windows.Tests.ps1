@@ -60,6 +60,7 @@ function Mock-Setup {
     function global:Set-GitHubAccess { $script:actions += 'github-auth' }
     function global:Install-NodeWithFnm { $script:actions += 'node-fnm' }
     function global:Set-TerminalSettings { param($UseNerdFont) $script:actions += "terminal-font-$UseNerdFont" }
+    function global:Set-TaskbarPreferences { $script:actions += 'taskbar'; return $true }
     function global:Test-Path { param($Path) return $true }
     function global:New-Item { param($Path, [switch] $Force) }
     function global:New-ItemProperty { param($Path, $Name, $Value, $PropertyType, [switch] $Force) }
@@ -89,6 +90,7 @@ Test-Case 'Defaults include developer, messaging, Elgato, fnm and Terminal setup
     Assert-True ('Microsoft.Azure.DevCLI' -notin $script:installed) 'azd should be opt-in.'
     Assert-True ('Microsoft.AzureCLI' -in $script:installed) 'az should remain selected.'
     Assert-True ('github-auth' -notin $script:actions) 'GitHub login should be opt-in.'
+    Assert-True ('taskbar' -notin $script:actions) 'Taskbar changes should be opt-in.'
     Assert-True ($script:packageSources['9PMX96TSF295'] -eq 'msstore') 'Spend Tray must use the Microsoft Store source.'
     Assert-True ($script:packageSources['9NCBCSZSJRSB'] -eq 'msstore') 'Spotify must use the Microsoft Store source.'
     Assert-True ($script:packageSources['Microsoft.PowerToys'] -eq 'winget') 'PowerToys should use the WinGet source.'
@@ -161,6 +163,46 @@ Test-Case 'GitHub access uses browser login and a host-specific Git credential h
     Assert-True ('gh auth login --hostname github.com --git-protocol https --web' -in $script:commands) 'Missing browser login.'
     Assert-True ('gh auth setup-git --hostname github.com' -in $script:commands) 'Missing Git credential configuration.'
     Assert-True ('gh auth status --hostname github.com' -in $script:commands) 'Missing authentication verification.'
+}
+
+Test-Case 'Taskbar customization can be selected explicitly' {
+    Mock-Setup -Answers @('none', '19', '', 'y')
+    Start-WindowsSetup
+    Assert-True ('taskbar' -in $script:actions) 'Taskbar selection was ignored.'
+    Assert-True ($script:installed.Count -eq 0) 'Taskbar selection installed packages.'
+}
+
+Test-Case 'Taskbar permission denials are reported without failing other setup steps' {
+    Mock-Setup -Answers @('none', '19', '', 'y')
+    function global:Set-TaskbarPreferences { return $false }
+    $warnings = @()
+    Start-WindowsSetup -WarningVariable warnings
+    Assert-True (($warnings | Out-String) -like '*taskbar customization was not completed*') 'Missing incomplete-taskbar summary.'
+}
+
+Test-Case 'Taskbar helper reports permission errors but does not hide unrelated errors' {
+    function global:Test-Path { param($Path) return $true }
+    $script:taskbarWrites = @()
+    function global:New-ItemProperty {
+        param($Path, $Name, $Value, $PropertyType, [switch] $Force)
+        $script:taskbarWrites += $Name
+        if ($script:taskbarError) { throw $script:taskbarError }
+    }
+    $script:taskbarError = $null
+    Assert-True (Set-TaskbarPreferences) 'Writable taskbar settings did not complete.'
+    Assert-True ('TaskbarDa' -in $script:taskbarWrites -and 'SearchboxTaskbarMode' -in $script:taskbarWrites) 'Missing taskbar settings.'
+    foreach ($errorObject in @(
+        [System.UnauthorizedAccessException]::new('Access denied'),
+        [System.Security.SecurityException]::new('Requested registry access is not allowed')
+    )) {
+        $script:taskbarError = $errorObject
+        $warnings = @()
+        $applied = Set-TaskbarPreferences -WarningVariable warnings
+        Assert-True (!$applied) 'Permission denial was reported as success.'
+        Assert-True (($warnings | Out-String) -like '*Taskbar customization was not completed*') 'Permission failure was hidden.'
+    }
+    $script:taskbarError = [System.IO.IOException]::new('Unrelated registry failure')
+    Assert-Throws { Set-TaskbarPreferences } 'Unrelated registry failure'
 }
 
 Test-Case 'PowerShell dependency is checked before installations' {
