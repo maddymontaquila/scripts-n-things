@@ -106,25 +106,111 @@ function Install-WslContainers {
     }
 }
 
-function Set-PoshProfile {
+function Add-PowerShellProfileLine {
+    param([string] $Line, [string] $Marker)
+
     $pwsh = Get-Command pwsh -ErrorAction Stop
     $profileOutput = & $pwsh.Source -NoProfile -Command '$PROFILE.CurrentUserAllHosts'
     if ($LASTEXITCODE -ne 0) { throw 'Could not locate the PowerShell 7 profile.' }
     $profilePath = ($profileOutput | Out-String).Trim()
     if (!$profilePath) { throw 'PowerShell 7 returned an empty profile path.' }
 
-    $themePath = Join-Path $HOME '.mytheme.omp.json'
-    Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/maddymontaquila/ohmyposh-config/refs/heads/main/.mytheme.omp.json' -OutFile $themePath
     if (!(Test-Path $profilePath)) {
         New-Item -ItemType File -Path $profilePath -Force | Out-Null
     }
-    $ompInit = "oh-my-posh init pwsh --config '$($themePath.Replace("'", "''"))' | Invoke-Expression"
     $profileContent = [IO.File]::ReadAllText($profilePath)
-    if (!$profileContent.Contains('oh-my-posh init pwsh')) {
-        Set-Content -LiteralPath $profilePath -Value "$profileContent`n$ompInit" -Encoding UTF8
+    if (!$profileContent.Contains($Marker)) {
+        Set-Content -LiteralPath $profilePath -Value "$profileContent`n$Line" -Encoding UTF8
     }
+}
+
+function Set-PoshProfile {
+    $themePath = Join-Path $HOME '.mytheme.omp.json'
+    Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/maddymontaquila/ohmyposh-config/refs/heads/main/.mytheme.omp.json' -OutFile $themePath
+    $ompInit = "oh-my-posh init pwsh --config '$($themePath.Replace("'", "''"))' | Invoke-Expression"
+    Add-PowerShellProfileLine -Line $ompInit -Marker 'oh-my-posh init pwsh'
     Invoke-Checked -Command 'oh-my-posh' -Arguments @('font', 'install', 'meslo')
-    Write-Host 'In Terminal settings, select the installed Meslo Nerd Font for your PowerShell profile.'
+}
+
+function Install-NodeWithFnm {
+    Invoke-Checked -Command 'fnm' -Arguments @('install', '--lts')
+    Invoke-Checked -Command 'fnm' -Arguments @('default', 'lts-latest')
+    Invoke-Checked -Command 'fnm' -Arguments @('exec', '--using', 'default', 'node', '--version')
+    Add-PowerShellProfileLine -Line 'fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression' -Marker 'fnm env'
+    Invoke-Checked -Command 'fnm' -Arguments @('list')
+    Write-Host 'Open a new PowerShell 7 window to use Node. fnm switches versions using .node-version or .nvmrc.'
+}
+
+function Update-TerminalSettingsFile {
+    param([string] $Path, [string] $PowerShellPath, [string] $FontFace = '')
+
+    # Run in PowerShell 7 to read Terminal JSON with comments and trailing commas.
+    $settings = if (Test-Path $Path) {
+        Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json -AsHashtable
+    } else { @{} }
+    if ($settings -isnot [Collections.IDictionary]) { throw "Invalid Terminal settings object: $Path" }
+    if (!$settings.Contains('profiles')) { $settings['profiles'] = @{} }
+    if ($settings['profiles'] -isnot [Collections.IDictionary]) { throw "Invalid Terminal profiles object: $Path" }
+    $profiles = $settings['profiles']
+    if (!$profiles.Contains('list')) { $profiles['list'] = @() }
+    if ($profiles['list'] -isnot [array]) { throw "Invalid Terminal profiles list: $Path" }
+    foreach ($profile in $profiles['list']) {
+        if ($profile -isnot [Collections.IDictionary]) { throw "Invalid Terminal profile entry: $Path" }
+    }
+
+    $profile = $profiles['list'] | Where-Object {
+        $_['source'] -eq 'Windows.Terminal.PowershellCore' -and $_['hidden'] -ne $true
+    } | Select-Object -First 1
+    if (!$profile) {
+        $profile = $profiles['list'] | Where-Object {
+            $_['guid'] -eq '{64d9d19a-e036-4f98-91be-52ef9dbf8c31}'
+        } | Select-Object -First 1
+        if (!$profile) {
+            $profile = @{ guid = '{64d9d19a-e036-4f98-91be-52ef9dbf8c31}'; name = 'PowerShell 7 (setup)' }
+            $profiles['list'] = @($profiles['list']) + @($profile)
+        }
+        $profile['commandline'] = '"' + $PowerShellPath + '"'
+        $profile['hidden'] = $false
+    }
+    if (!$profile['guid']) { throw "PowerShell Terminal profile has no GUID: $Path" }
+    $settings['defaultProfile'] = $profile['guid']
+    if ($FontFace) {
+        if (!$profile.Contains('font')) { $profile['font'] = @{} }
+        if ($profile['font'] -isnot [Collections.IDictionary]) { throw "Invalid PowerShell font settings: $Path" }
+        $profile['font']['face'] = $FontFace
+    }
+    $json = $settings | ConvertTo-Json -Depth 100
+    $directory = Split-Path -Parent $Path
+    if (!(Test-Path $directory)) { New-Item -ItemType Directory -Path $directory -Force | Out-Null }
+    if (Test-Path $Path) {
+        $backup = "$Path.setup-backup-$([guid]::NewGuid())"
+        Copy-Item -LiteralPath $Path -Destination $backup
+        Write-Host "Terminal settings backup: $backup"
+    }
+    Set-Content -LiteralPath $Path -Value $json -Encoding UTF8
+    Write-Host "Configured Terminal PowerShell profile: $Path"
+}
+
+function Set-TerminalSettings {
+    param([bool] $UseNerdFont)
+
+    $pwsh = (Get-Command pwsh -ErrorAction Stop).Source
+    $packagedPath = Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json'
+    $unpackagedPath = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\settings.json'
+    $paths = @($packagedPath, $unpackagedPath | Where-Object { Test-Path $_ })
+    if ($paths.Count -eq 0) { $paths = @($packagedPath) }
+    $font = if ($UseNerdFont) { 'MesloLGM Nerd Font' } else { '' }
+    foreach ($path in $paths) {
+        $command = @"
+function Update-TerminalSettingsFile {
+$(${function:Update-TerminalSettingsFile}.ToString())
+}
+Update-TerminalSettingsFile -Path '$($path.Replace("'", "''"))' -PowerShellPath '$($pwsh.Replace("'", "''"))' -FontFace '$font'
+"@
+        $encodedCommand = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes("`$ErrorActionPreference = 'Stop'`n$command"))
+        Invoke-Checked -Command $pwsh -Arguments @('-NoProfile', '-OutputFormat', 'Text', '-EncodedCommand', $encodedCommand)
+    }
+    Write-Host 'PowerShell 7 is the Terminal default profile. The OS default terminal application is still set in Terminal > Settings > Startup.'
 }
 
 function Test-SetupAdministrator {
@@ -165,7 +251,7 @@ function Start-WindowsSetup {
         [pscustomobject]@{ Name = 'Discord'; Id = 'Discord.Discord'; Selected = $true }
         [pscustomobject]@{ Name = 'Microsoft Office'; Id = 'Microsoft.Office'; Selected = $true }
         [pscustomobject]@{ Name = 'Microsoft Edge Beta'; Id = 'Microsoft.Edge.Beta'; Selected = $true }
-        [pscustomobject]@{ Name = 'Node.js LTS'; Id = 'OpenJS.NodeJS.LTS'; Selected = $false }
+        [pscustomobject]@{ Name = 'fnm + Node.js LTS + automatic project version switching'; Id = 'Schniz.fnm'; Selected = $true }
         [pscustomobject]@{ Name = 'WSL containers (wslc) + Ubuntu (restart may be needed)'; Id = 'wsl'; Selected = $true }
         [pscustomobject]@{ Name = 'Hide Widgets and use taskbar search icon'; Id = 'taskbar'; Selected = $true }
         [pscustomobject]@{ Name = 'Elgato Control Center'; Id = 'Elgato.ControlCenter'; Selected = $true }
@@ -174,6 +260,7 @@ function Start-WindowsSetup {
         [pscustomobject]@{ Name = 'Signal'; Id = 'OpenWhisperSystems.Signal'; Selected = $true }
         [pscustomobject]@{ Name = 'Slack'; Id = 'SlackTechnologies.Slack'; Selected = $true }
         [pscustomobject]@{ Name = 'GitHub browser sign-in + HTTPS Git credentials (interactive)'; Id = 'github-auth'; Selected = $false }
+        [pscustomobject]@{ Name = 'Terminal: PowerShell 7 default profile + Nerd Font if selected'; Id = 'terminal-settings'; Selected = $true }
     )
 
     Write-Host 'Select your Windows setup. Nothing is installed until you confirm.' -ForegroundColor Cyan
@@ -222,13 +309,17 @@ function Start-WindowsSetup {
     }
     if (!(Read-YesNo "Apply these $($selected.Count) selections?")) { return }
 
-    $packageOptions = @($selected | Where-Object { $_.Id -notin @('dotnetup', 'wsl', 'taskbar', 'github-auth') })
+    $packageOptions = @($selected | Where-Object { $_.Id -notin @('dotnetup', 'wsl', 'taskbar', 'github-auth', 'terminal-settings') })
     if (($packageOptions.Count -gt 0 -or 'wsl' -in $selected.Id) -and !(Get-Command winget -ErrorAction SilentlyContinue)) {
         throw 'WinGet is unavailable. Install/update App Installer from Microsoft Store, open a new terminal, and rerun.'
     }
-    if (('JanDeDobbeleer.OhMyPosh' -in $selected.Id -or 'dotnetup' -in $selected.Id -or 'GitHub.Copilot' -in $selected.Id) -and
+    if (@($selected.Id | Where-Object { $_ -in @('JanDeDobbeleer.OhMyPosh', 'dotnetup', 'GitHub.Copilot', 'Schniz.fnm', 'terminal-settings') }).Count -gt 0 -and
         'Microsoft.PowerShell' -notin $selected.Id -and !(Get-Command pwsh -ErrorAction SilentlyContinue)) {
-        throw 'The custom prompt, dotnetup shell configuration, and Copilot CLI require PowerShell 7. Select it in the menu or install it first.'
+        throw 'The selected shell configuration steps require PowerShell 7. Select it in the menu or install it first.'
+    }
+    if ('terminal-settings' -in $selected.Id -and 'Microsoft.WindowsTerminal' -notin $selected.Id -and
+        !(Get-Command wt -ErrorAction SilentlyContinue)) {
+        throw 'Terminal settings require Windows Terminal. Select it in the menu or install it first.'
     }
     if ('github-auth' -in $selected.Id) {
         foreach ($dependency in @(
@@ -246,6 +337,10 @@ function Start-WindowsSetup {
     }
     if ('dotnetup' -in $selected.Id) { Install-DotNet10 }
     if ('JanDeDobbeleer.OhMyPosh' -in $selected.Id) { Set-PoshProfile }
+    if ('Schniz.fnm' -in $selected.Id) { Install-NodeWithFnm }
+    if ('terminal-settings' -in $selected.Id) {
+        Set-TerminalSettings -UseNerdFont ('JanDeDobbeleer.OhMyPosh' -in $selected.Id)
+    }
     if ('github-auth' -in $selected.Id) { Set-GitHubAccess }
 
     if ('wsl' -in $selected.Id) { Install-WslContainers }
@@ -263,7 +358,7 @@ function Start-WindowsSetup {
     Write-Host 'Selected setup steps completed. Open a new terminal before using installed tools.' -ForegroundColor Green
     if ($script:rebootRequired) { Write-Warning 'Restart Windows before using WSL / Docker.' }
     if ('Microsoft.WindowsTerminal' -in $selected.Id) {
-        Write-Host 'Terminal > Settings > Startup: choose your default terminal application and PowerShell 7 profile.'
+        Write-Host 'Terminal > Settings > Startup: choose Windows Terminal as the OS default terminal application.'
     }
     if ('Docker.DockerDesktop' -in $selected.Id) {
         Write-Host 'Launch Docker Desktop to finish setup and enable Ubuntu integration if wanted.'

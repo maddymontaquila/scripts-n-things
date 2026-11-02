@@ -36,14 +36,67 @@ Meslo Nerd Font, Azure CLI / VPN Client, Aspire CLI, Discord,
 Office, Edge Beta, WSL containers with Ubuntu, taskbar preferences, and Elgato
 Control Center / Stream Deck / Camera Hub. Signal and Slack are selected too;
 Discord remains selected.
-**Docker Desktop, Node.js LTS, and Azure Developer CLI (`azd`) are initially unchecked.**
+fnm with Node.js LTS and Terminal configuration are also selected by default.
+**Docker Desktop and Azure Developer CLI (`azd`) are initially unchecked.**
 Azure CLI (`az`) remains selected. Aspire CLI is
 installed through WinGet (`Microsoft.Aspire`), not its standalone install script.
 Existing installed apps are not bulk-upgraded.
 
 Oh My Posh styles the prompt; Nerd Fonts supply the icons. The Oh My Posh
 selection installs both the prompt tool and Meslo Nerd Font and configures the
-custom prompt. You still need to choose the font in Terminal settings.
+custom prompt. With Terminal configuration selected, that font is applied to
+the PowerShell 7 profile automatically.
+
+## Terminal settings
+
+The selected-by-default Terminal configuration step makes PowerShell 7 the
+default profile. If Oh My Posh/Meslo is also selected, it sets that profile's
+font to `MesloLGM Nerd Font`; otherwise it leaves the font unchanged.
+PowerShell 7 and Windows Terminal must be installed or selected.
+
+Existing stable packaged or unpackaged Terminal settings are updated; a fresh
+install is configured before its first launch. Other profiles and settings
+are preserved, and an existing PowerShell dynamic profile is reused when
+available. Each existing settings file gets a uniquely named
+`settings.json.setup-backup-*` copy before writing. JSON comments and formatting
+are normalized when the settings are saved; invalid settings stop setup rather
+than being replaced. Terminal Preview is not modified.
+
+The **OS default terminal application** is separate from the default shell
+profile. Select Windows Terminal under Terminal > Settings > Startup for that
+OS setting; setup does not use unsupported CLI flags or hardcoded delegation
+registry values.
+
+## Node versions with fnm
+
+Setup installs [fnm](https://github.com/Schniz/fnm) through WinGet (`Schniz.fnm`),
+then installs the current Node.js LTS and makes it the default. It does not
+install a second standalone Node.js package. fnm is useful for switching
+between projects without replacing one machine-wide Node installation.
+
+The PowerShell 7 profile gets:
+
+```powershell
+fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression
+```
+
+Open a new PowerShell 7 window after setup. `.node-version` and `.nvmrc` files
+select the project version automatically as you change directories. Install
+each project's required version first:
+
+```powershell
+fnm install 22
+fnm use 22
+# Or, from a project containing .node-version / .nvmrc:
+fnm install
+fnm use
+node --version
+npm --version
+```
+
+Do not install standalone Node or configure another version manager alongside
+fnm unless you intentionally manage their PATH precedence. This configures
+Windows PowerShell 7, not Ubuntu's shell.
 
 ## GitHub organization access
 
@@ -121,9 +174,10 @@ Restart Windows if requested, then launch Ubuntu to create your Linux user.
 If you selected Docker Desktop, launch it to complete its first-run setup.
 Installing Windows tools does not also provision their equivalents inside Ubuntu.
 
-In Windows Terminal's settings, choose the default terminal application, the
-PowerShell 7 default profile, and the installed Meslo Nerd Font. The custom
-prompt is added to the actual PowerShell 7 current-user/all-hosts profile.
+In Windows Terminal's settings, choose the OS default terminal application.
+PowerShell 7 and Meslo are configured by the Terminal setup selection.
+The custom prompt and fnm initialization are added to the actual PowerShell 7
+current-user/all-hosts profile without duplicating them on reruns.
 Taskbar changes take effect after signing out or restarting; Explorer is not
 forcibly restarted.
 

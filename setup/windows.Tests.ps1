@@ -1,5 +1,5 @@
 # Run with: pwsh -NoProfile -File ./setup/windows.Tests.ps1
-# All installation and Windows-specific operations are mocked.
+# Installations are mocked; Terminal settings use temporary files.
 $ErrorActionPreference = 'Stop'
 $scriptPath = Join-Path $PSScriptRoot 'windows.ps1'
 $tokens = $null
@@ -56,6 +56,8 @@ function Mock-Setup {
     function global:Set-PoshProfile { $script:actions += 'prompt-font' }
     function global:Install-WslContainers { $script:actions += 'wslc' }
     function global:Set-GitHubAccess { $script:actions += 'github-auth' }
+    function global:Install-NodeWithFnm { $script:actions += 'node-fnm' }
+    function global:Set-TerminalSettings { param($UseNerdFont) $script:actions += "terminal-font-$UseNerdFont" }
     function global:Test-Path { param($Path) return $true }
     function global:New-Item { param($Path, [switch] $Force) }
     function global:New-ItemProperty { param($Path, $Name, $Value, $PropertyType, [switch] $Force) }
@@ -68,23 +70,23 @@ function Test-Case {
     Write-Host "PASS: $Name"
 }
 
-Test-Case 'Defaults include Git, gh, both Copilots, Aspire and Elgato apps; Docker and Node are opt-in' {
+Test-Case 'Defaults include developer, messaging, Elgato, fnm and Terminal setup; Docker and azd are opt-in' {
     Mock-Setup -Answers @('', 'y')
     Start-WindowsSetup
     foreach ($id in @(
         'Git.Git', 'GitHub.cli', 'GitHub.Copilot', 'GitHub.CopilotApp', 'Microsoft.Aspire',
         'Elgato.ControlCenter', 'Elgato.StreamDeck', 'Elgato.CameraHub',
-        'OpenWhisperSystems.Signal', 'SlackTechnologies.Slack', 'Discord.Discord'
+        'OpenWhisperSystems.Signal', 'SlackTechnologies.Slack', 'Discord.Discord', 'Schniz.fnm'
     )) {
         Assert-True ($id -in $script:installed) "Missing default package: $id"
     }
     Assert-True ('Docker.DockerDesktop' -notin $script:installed) 'Docker should be opt-in.'
-    Assert-True ('OpenJS.NodeJS.LTS' -notin $script:installed) 'Node should be opt-in.'
+    Assert-True ('OpenJS.NodeJS.LTS' -notin $script:installed) 'Do not install standalone Node alongside fnm.'
     Assert-True ('Microsoft.Azure.DevCLI' -notin $script:installed) 'azd should be opt-in.'
     Assert-True ('Microsoft.AzureCLI' -in $script:installed) 'az should remain selected.'
     Assert-True ('github-auth' -notin $script:actions) 'GitHub login should be opt-in.'
     Assert-True (($script:installed -like 'Microsoft.DotNet.SDK*').Count -eq 0) 'Do not install .NET through WinGet.'
-    foreach ($action in @('dotnet10', 'prompt-font', 'wslc')) {
+    foreach ($action in @('dotnet10', 'prompt-font', 'wslc', 'node-fnm', 'terminal-font-True')) {
         Assert-True ($action -in $script:actions) "Missing default action: $action"
     }
 }
@@ -102,7 +104,7 @@ Test-Case 'Custom exact IDs can be added without restoring default selections' {
 }
 
 Test-Case 'Custom packages can be toggled off' {
-    Mock-Setup -Answers @('none', 'add', 'Microsoft.PowerToys', '27', '')
+    Mock-Setup -Answers @('none', 'add', 'Microsoft.PowerToys', '28', '')
     Start-WindowsSetup
     Assert-True ($script:installed.Count -eq 0) 'Deselected custom package was installed.'
 }
@@ -113,12 +115,19 @@ Test-Case 'Invalid IDs and menu numbers are rejected without changing selections
     Assert-True ($script:installed.Count -eq 0) 'Invalid input changed selection.'
 }
 
-Test-Case 'Comma-separated toggles enable Docker and Node' {
+Test-Case 'Comma-separated toggles enable Docker and fnm' {
     Mock-Setup -Answers @('none', '7,18', '', 'y')
     Start-WindowsSetup
     Assert-True ($script:installed.Count -eq 2) 'Unexpected selection count.'
     Assert-True ('Docker.DockerDesktop' -in $script:installed) 'Docker was not selected.'
-    Assert-True ('OpenJS.NodeJS.LTS' -in $script:installed) 'Node was not selected.'
+    Assert-True ('Schniz.fnm' -in $script:installed) 'fnm was not selected.'
+    Assert-True ('node-fnm' -in $script:actions) 'Node was not configured.'
+}
+
+Test-Case 'Terminal configuration without Oh My Posh preserves font choice' {
+    Mock-Setup -Answers @('none', '27', '', 'y')
+    Start-WindowsSetup
+    Assert-True ('terminal-font-False' -in $script:actions) 'Terminal should not select an uninstalled Nerd Font.'
 }
 
 Test-Case 'Quit and declined confirmation make no changes' {
@@ -266,6 +275,119 @@ Test-Case 'Prompt setup preserves an existing Unicode profile and does not dupli
         Assert-True (([regex]::Matches($content, 'oh-my-posh init pwsh')).Count -eq 1) 'Duplicate prompt initialization.'
         Assert-True ('oh-my-posh font install meslo' -in $script:commands) 'Nerd Font was not installed.'
     } finally { [IO.File]::Delete($script:testProfile) }
+}
+
+Test-Case 'fnm installs LTS, sets the default, and adds project switching to the profile' {
+    function global:Invoke-Checked {
+        param($Command, $Arguments)
+        $script:commands += "$Command $($Arguments -join ' ')"
+    }
+    function global:Add-PowerShellProfileLine {
+        param($Line, $Marker)
+        $script:profileLine = $Line
+    }
+    Install-NodeWithFnm
+    Assert-True ('fnm install --lts' -in $script:commands) 'Missing LTS installation.'
+    Assert-True ('fnm default lts-latest' -in $script:commands) 'Missing default version.'
+    Assert-True ('fnm exec --using default node --version' -in $script:commands) 'Installed Node was not verified.'
+    Assert-True ($script:profileLine -eq 'fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression') 'Missing project switching.'
+}
+
+function Invoke-TerminalFixture {
+    param([scriptblock] $Body)
+    foreach ($name in @('Test-Path', 'New-Item', 'Join-Path', 'Get-Command')) {
+        Remove-Item -LiteralPath "Function:\$name" -ErrorAction SilentlyContinue
+    }
+    $directory = [IO.Path]::Combine([IO.Path]::GetTempPath(), "terminal-setup-$([guid]::NewGuid())")
+    [IO.Directory]::CreateDirectory($directory) | Out-Null
+    try { & $Body $directory } finally { Remove-Item -LiteralPath $directory -Recurse -Force }
+}
+
+Test-Case 'Terminal JSONC keeps settings, backs up the original, and updates the existing PowerShell profile' {
+    Invoke-TerminalFixture {
+        param($directory)
+        $path = Join-Path $directory 'settings.json'
+        $original = @'
+{
+    // Keep user settings even though serialization removes comments.
+    "theme": "dark",
+    "profiles": {
+        "defaults": { "font": { "size": 14 } },
+        "list": [
+            { "guid": "{existing-pwsh}", "name": "My PowerShell", "source": "Windows.Terminal.PowershellCore", "font": { "size": 16 }, },
+            { "guid": "{ubuntu}", "name": "Ubuntu", "colorScheme": "Campbell" },
+        ],
+    },
+}
+'@
+        [IO.File]::WriteAllText($path, $original)
+        Update-TerminalSettingsFile -Path $path -PowerShellPath 'C:\Program Files\PowerShell\7\pwsh.exe' -FontFace 'MesloLGM Nerd Font'
+        $settings = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+        Assert-True ($settings.defaultProfile -eq '{existing-pwsh}') 'Existing PowerShell profile was not reused.'
+        Assert-True ($settings.theme -eq 'dark') 'Unrelated settings changed.'
+        Assert-True ($settings.profiles.list.Count -eq 2) 'Extra profile created.'
+        Assert-True ($settings.profiles.list[0].font.face -eq 'MesloLGM Nerd Font') 'Font face was not configured.'
+        Assert-True ($settings.profiles.list[0].font.size -eq 16) 'Existing font size changed.'
+        Assert-True ($settings.profiles.list[1].colorScheme -eq 'Campbell') 'Ubuntu settings changed.'
+        $backups = @(Get-ChildItem -LiteralPath $directory -Filter 'settings.json.setup-backup-*')
+        Assert-True ($backups.Count -eq 1) 'Missing settings backup.'
+        Assert-True ([IO.File]::ReadAllText($backups[0].FullName) -eq $original) 'Backup differs from original.'
+        Update-TerminalSettingsFile -Path $path -PowerShellPath 'C:\Program Files\PowerShell\7\pwsh.exe'
+        $settings = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+        Assert-True ($settings.profiles.list.Count -eq 2) 'Rerun duplicated profile.'
+        Assert-True ($settings.profiles.list[0].font.face -eq 'MesloLGM Nerd Font') 'Omitted font option changed the font.'
+    }
+}
+
+Test-Case 'Terminal settings work before first launch and remain idempotent' {
+    Invoke-TerminalFixture {
+        param($directory)
+        $path = Join-Path $directory 'new/settings.json'
+        Update-TerminalSettingsFile -Path $path -PowerShellPath 'C:\Program Files\PowerShell\7\pwsh.exe'
+        Update-TerminalSettingsFile -Path $path -PowerShellPath 'C:\Program Files\PowerShell\7\pwsh.exe'
+        $settings = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+        Assert-True ($settings.profiles.list.Count -eq 1) 'New profile duplicated.'
+        Assert-True ($settings.defaultProfile -eq $settings.profiles.list[0].guid) 'Wrong default profile.'
+        Assert-True ($settings.profiles.list[0].commandline -eq '"C:\Program Files\PowerShell\7\pwsh.exe"') 'PowerShell path was not quoted.'
+        Assert-True ($null -eq $settings.profiles.list[0].font) 'Font should be untouched.'
+    }
+}
+
+Test-Case 'Invalid Terminal JSON or schema is not overwritten' {
+    Invoke-TerminalFixture {
+        param($directory)
+        $path = Join-Path $directory 'settings.json'
+        foreach ($content in @('{invalid', '{"profiles": []}', '{"profiles": {"list": [null]}}')) {
+            [IO.File]::WriteAllText($path, $content)
+            Assert-Throws { Update-TerminalSettingsFile -Path $path -PowerShellPath 'pwsh.exe' } ''
+            Assert-True ([IO.File]::ReadAllText($path) -eq $content) 'Invalid settings were overwritten.'
+        }
+    }
+}
+
+Test-Case 'Terminal wrapper runs the settings editor in a real PowerShell 7 process' {
+    Invoke-TerminalFixture {
+        param($directory)
+        $savedLocalAppData = $env:LOCALAPPDATA
+        $script:actualPowerShell = (Get-Process -Id $PID).Path
+        function global:Get-Command {
+            param($Name, $ErrorAction)
+            return [pscustomobject]@{ Source = $script:actualPowerShell }
+        }
+        try {
+            $env:LOCALAPPDATA = $directory
+            Set-TerminalSettings -UseNerdFont $true
+            $path = Join-Path $directory 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json'
+            $settings = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+            Assert-True ($settings.profiles.list[0].font.face -eq 'MesloLGM Nerd Font') 'Child process did not configure Terminal.'
+            $unpackagedPath = Join-Path $directory 'Microsoft\Windows Terminal\settings.json'
+            [IO.Directory]::CreateDirectory((Split-Path -Parent $unpackagedPath)) | Out-Null
+            [IO.File]::WriteAllText($unpackagedPath, '{}')
+            Set-TerminalSettings -UseNerdFont $false
+            $unpackagedSettings = Get-Content -LiteralPath $unpackagedPath -Raw | ConvertFrom-Json
+            Assert-True ($unpackagedSettings.profiles.list.Count -eq 1) 'Existing unpackaged Terminal was not configured.'
+        } finally { $env:LOCALAPPDATA = $savedLocalAppData }
+    }
 }
 
 Write-Host 'All Windows setup tests passed.'
