@@ -32,7 +32,7 @@ fix the reported issue and rerun, deselecting steps you no longer want.
 Defaults include PowerShell 7, .NET 10 via dotnetup, Git, GitHub CLI, GitHub
 Copilot CLI (`GitHub.Copilot`), the GitHub Copilot app (`GitHub.CopilotApp`),
 Windows Terminal, VS Code Insiders, Oh My Posh with the custom theme and
-Meslo Nerd Font, Azure CLI / VPN Client, Aspire CLI, Discord,
+Fantasque Nerd Font, Azure CLI / VPN Client, Aspire CLI, Discord,
 Edge Beta, WSL containers with Ubuntu, and Elgato
 Control Center / Stream Deck / Camera Hub. Signal and Slack are selected too;
 Discord remains selected.
@@ -69,7 +69,7 @@ Installer hash errors do not identify their underlying cause by themselves;
 stale manifests, changed upstream downloads, or damaged downloads are possible.
 
 Oh My Posh styles the prompt; Nerd Fonts supply the icons. The Oh My Posh
-selection installs both the prompt tool and Meslo Nerd Font and configures the
+selection installs both the prompt tool and Fantasque Sans Mono Nerd Font and configures the
 custom prompt from this repository's
 [`terminal/madtheme.omp.json`](../terminal/madtheme.omp.json), not the old
 ohmyposh-config repository. It includes contextual Aspire AppHost/running status
@@ -79,8 +79,8 @@ selected, the font is applied to the PowerShell 7 profile automatically.
 ## Terminal settings
 
 The selected-by-default Terminal configuration step makes PowerShell 7 the
-default profile. If Oh My Posh/Meslo is also selected, it sets that profile's
-font to `MesloLGM Nerd Font`; otherwise it leaves the font unchanged.
+default profile. If Oh My Posh/Fantasque is also selected, it sets that profile's
+font to `FantasqueSansM Nerd Font`; otherwise it leaves the font unchanged.
 PowerShell 7 and Windows Terminal must be installed or selected.
 
 Existing stable packaged or unpackaged Terminal settings are updated; a fresh
@@ -204,7 +204,7 @@ If you selected Docker Desktop, launch it to complete its first-run setup.
 Installing Windows tools does not also provision their equivalents inside Ubuntu.
 
 In Windows Terminal's settings, choose the OS default terminal application.
-PowerShell 7 and Meslo are configured by the Terminal setup selection.
+PowerShell 7 and Fantasque are configured by the Terminal setup selection.
 The custom prompt and fnm initialization are added to the actual PowerShell 7
 current-user/all-hosts profile without duplicating them on reruns.
 Taskbar customization is opt-in. If Windows denies registry access, setup

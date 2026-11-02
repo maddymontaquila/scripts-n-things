@@ -331,7 +331,7 @@ Test-Case 'Prompt setup preserves an existing Unicode profile and does not dupli
         $content = [IO.File]::ReadAllText($script:testProfile)
         Assert-True ($content.StartsWith($existingContent)) 'Existing profile content was damaged.'
         Assert-True (([regex]::Matches($content, 'oh-my-posh init pwsh')).Count -eq 1) 'Duplicate prompt initialization.'
-        Assert-True ('oh-my-posh font install meslo' -in $script:commands) 'Nerd Font was not installed.'
+        Assert-True ('oh-my-posh font install FantasqueSansMono' -in $script:commands) 'Nerd Font was not installed.'
         Assert-True ($script:themeUri -eq 'https://raw.githubusercontent.com/maddymontaquila/scripts-n-things/main/terminal/madtheme.omp.json') 'Theme should come from this repository.'
     } finally { [IO.File]::Delete($script:testProfile) }
 }
@@ -380,12 +380,12 @@ Test-Case 'Terminal JSONC keeps settings, backs up the original, and updates the
 }
 '@
         [IO.File]::WriteAllText($path, $original)
-        Update-TerminalSettingsFile -Path $path -PowerShellPath 'C:\Program Files\PowerShell\7\pwsh.exe' -FontFace 'MesloLGM Nerd Font'
+        Update-TerminalSettingsFile -Path $path -PowerShellPath 'C:\Program Files\PowerShell\7\pwsh.exe' -FontFace 'FantasqueSansM Nerd Font'
         $settings = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
         Assert-True ($settings.defaultProfile -eq '{existing-pwsh}') 'Existing PowerShell profile was not reused.'
         Assert-True ($settings.theme -eq 'dark') 'Unrelated settings changed.'
         Assert-True ($settings.profiles.list.Count -eq 2) 'Extra profile created.'
-        Assert-True ($settings.profiles.list[0].font.face -eq 'MesloLGM Nerd Font') 'Font face was not configured.'
+        Assert-True ($settings.profiles.list[0].font.face -eq 'FantasqueSansM Nerd Font') 'Font face was not configured.'
         Assert-True ($settings.profiles.list[0].font.size -eq 16) 'Existing font size changed.'
         Assert-True ($settings.profiles.list[1].colorScheme -eq 'Campbell') 'Ubuntu settings changed.'
         $backups = @(Get-ChildItem -LiteralPath $directory -Filter 'settings.json.setup-backup-*')
@@ -394,7 +394,7 @@ Test-Case 'Terminal JSONC keeps settings, backs up the original, and updates the
         Update-TerminalSettingsFile -Path $path -PowerShellPath 'C:\Program Files\PowerShell\7\pwsh.exe'
         $settings = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
         Assert-True ($settings.profiles.list.Count -eq 2) 'Rerun duplicated profile.'
-        Assert-True ($settings.profiles.list[0].font.face -eq 'MesloLGM Nerd Font') 'Omitted font option changed the font.'
+        Assert-True ($settings.profiles.list[0].font.face -eq 'FantasqueSansM Nerd Font') 'Omitted font option changed the font.'
     }
 }
 
@@ -438,7 +438,7 @@ Test-Case 'Terminal wrapper runs the settings editor in a real PowerShell 7 proc
             Set-TerminalSettings -UseNerdFont $true
             $path = Join-Path $directory 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json'
             $settings = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
-            Assert-True ($settings.profiles.list[0].font.face -eq 'MesloLGM Nerd Font') 'Child process did not configure Terminal.'
+            Assert-True ($settings.profiles.list[0].font.face -eq 'FantasqueSansM Nerd Font') 'Child process did not configure Terminal.'
             $unpackagedPath = Join-Path $directory 'Microsoft\Windows Terminal\settings.json'
             [IO.Directory]::CreateDirectory((Split-Path -Parent $unpackagedPath)) | Out-Null
             [IO.File]::WriteAllText($unpackagedPath, '{}')

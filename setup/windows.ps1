@@ -133,7 +133,7 @@ function Set-PoshProfile {
     Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/maddymontaquila/scripts-n-things/main/terminal/madtheme.omp.json' -OutFile $themePath
     $ompInit = "oh-my-posh init pwsh --config '$($themePath.Replace("'", "''"))' | Invoke-Expression"
     Add-PowerShellProfileLine -Line $ompInit -Marker 'oh-my-posh init pwsh'
-    Invoke-Checked -Command 'oh-my-posh' -Arguments @('font', 'install', 'meslo')
+    Invoke-Checked -Command 'oh-my-posh' -Arguments @('font', 'install', 'FantasqueSansMono')
 }
 
 function Install-NodeWithFnm {
@@ -203,7 +203,7 @@ function Set-TerminalSettings {
     $unpackagedPath = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\settings.json'
     $paths = @($packagedPath, $unpackagedPath | Where-Object { Test-Path $_ })
     if ($paths.Count -eq 0) { $paths = @($packagedPath) }
-    $font = if ($UseNerdFont) { 'MesloLGM Nerd Font' } else { '' }
+    $font = if ($UseNerdFont) { 'FantasqueSansM Nerd Font' } else { '' }
     foreach ($path in $paths) {
         $command = @"
 function Update-TerminalSettingsFile {
@@ -271,7 +271,7 @@ function Start-WindowsSetup {
         [pscustomobject]@{ Name = 'Docker Desktop'; Id = 'Docker.DockerDesktop'; Selected = $false }
         [pscustomobject]@{ Name = 'Windows Terminal'; Id = 'Microsoft.WindowsTerminal'; Selected = $true }
         [pscustomobject]@{ Name = 'VS Code Insiders'; Id = 'Microsoft.VisualStudioCode.Insiders'; Selected = $true }
-        [pscustomobject]@{ Name = 'Oh My Posh + prompt + Meslo Nerd Font'; Id = 'JanDeDobbeleer.OhMyPosh'; Selected = $true }
+        [pscustomobject]@{ Name = 'Oh My Posh + prompt + Fantasque Nerd Font'; Id = 'JanDeDobbeleer.OhMyPosh'; Selected = $true }
         [pscustomobject]@{ Name = 'Azure CLI'; Id = 'Microsoft.AzureCLI'; Selected = $true }
         [pscustomobject]@{ Name = 'Azure VPN Client'; Id = 'Microsoft.AzureVPNClient'; Selected = $true }
         [pscustomobject]@{ Name = 'Azure Developer CLI'; Id = 'Microsoft.Azure.DevCLI'; Selected = $false }
