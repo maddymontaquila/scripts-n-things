@@ -267,6 +267,7 @@ function Start-WindowsSetup {
         [pscustomobject]@{ Name = 'Terminal: PowerShell 7 default profile + Nerd Font if selected'; Id = 'terminal-settings'; Selected = $true }
         [pscustomobject]@{ Name = 'GHCP Spend Tray (Microsoft Store)'; Id = '9PMX96TSF295'; Source = 'msstore'; Selected = $true }
         [pscustomobject]@{ Name = 'Microsoft PowerToys'; Id = 'Microsoft.PowerToys'; Selected = $true }
+        [pscustomobject]@{ Name = 'Audient iD driver + mixer (iD14)'; Id = 'Audient.iD'; Selected = $true }
     )
 
     Write-Host 'Select your Windows setup. Nothing is installed until you confirm.' -ForegroundColor Cyan
@@ -370,6 +371,9 @@ function Start-WindowsSetup {
     }
     if ('Docker.DockerDesktop' -in $selected.Id) {
         Write-Host 'Launch Docker Desktop to finish setup and enable Ubuntu integration if wanted.'
+    }
+    if ('Audient.iD' -in $selected.Id) {
+        Write-Host 'Open Audient iD to finish iD14 setup and check firmware. Restart Windows if the driver installer requests it.'
     }
     if ('GitHub.Copilot' -in $selected.Id -or 'GitHub.CopilotApp' -in $selected.Id) {
         Write-Host 'Launch copilot and the GitHub Copilot app to sign in. Organization policies may govern access.'

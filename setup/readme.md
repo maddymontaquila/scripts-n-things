@@ -43,6 +43,13 @@ by default too. Spend Tray uses WinGet's `msstore` source and product ID
 `9PMX96TSF295`; it requires Microsoft Store access and may be restricted by
 organization policy. Other apps use the `winget` source. Launch Spend Tray
 after installation to finish its onboarding.
+Audient's iD driver/mixer (`Audient.iD`) is selected for the iD14 as well.
+The available WinGet manifest currently reports version `4.4.0.0` and points
+to `iD-v4.4.2b6.exe`; this is the explicitly chosen WinGet package, not a
+guarantee of Audient's latest stable driver. For a stable-only installation,
+deselect it and use [Audient's downloads](https://audient.com/products/audio-interfaces/id14/downloads/).
+Open the iD app after installation to finish device setup and check firmware;
+restart Windows if requested. No separate EVO software is installed.
 **Docker Desktop and Azure Developer CLI (`azd`) are initially unchecked.**
 Azure CLI (`az`) remains selected. Aspire CLI is
 installed through WinGet (`Microsoft.Aspire`), not its standalone install script.
