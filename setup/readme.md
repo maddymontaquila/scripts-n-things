@@ -41,7 +41,9 @@ PowerToys (`Microsoft.PowerToys`) and
 [GHCP Spend Tray](https://apps.microsoft.com/detail/9pmx96tsf295) are selected
 by default too. Spend Tray uses WinGet's `msstore` source and product ID
 `9PMX96TSF295`; it requires Microsoft Store access and may be restricted by
-organization policy. Other apps use the `winget` source. Launch Spend Tray
+organization policy. Spotify is also selected via the `msstore` source using
+product ID `9NCBCSZSJRSB`, avoiding the standalone installer's restriction on
+running as administrator. Other apps use the `winget` source. Launch Spend Tray
 after installation to finish its onboarding.
 Audient's iD driver/mixer (`Audient.iD`) is selected for the iD14 as well.
 The available WinGet manifest currently reports version `4.4.0.0` and points

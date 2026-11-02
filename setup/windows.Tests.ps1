@@ -79,7 +79,7 @@ Test-Case 'Defaults include developer, messaging, Elgato, fnm and Terminal setup
         'Git.Git', 'GitHub.cli', 'GitHub.Copilot', 'GitHub.CopilotApp', 'Microsoft.Aspire',
         'Elgato.ControlCenter', 'Elgato.StreamDeck', 'Elgato.CameraHub',
         'OpenWhisperSystems.Signal', 'SlackTechnologies.Slack', 'Discord.Discord', 'Schniz.fnm',
-        '9PMX96TSF295', 'Microsoft.PowerToys', 'Audient.iD', 'Logitech.OptionsPlus'
+        '9PMX96TSF295', 'Microsoft.PowerToys', 'Audient.iD', 'Logitech.OptionsPlus', '9NCBCSZSJRSB'
     )) {
         Assert-True ($id -in $script:installed) "Missing default package: $id"
     }
@@ -90,6 +90,7 @@ Test-Case 'Defaults include developer, messaging, Elgato, fnm and Terminal setup
     Assert-True ('Microsoft.AzureCLI' -in $script:installed) 'az should remain selected.'
     Assert-True ('github-auth' -notin $script:actions) 'GitHub login should be opt-in.'
     Assert-True ($script:packageSources['9PMX96TSF295'] -eq 'msstore') 'Spend Tray must use the Microsoft Store source.'
+    Assert-True ($script:packageSources['9NCBCSZSJRSB'] -eq 'msstore') 'Spotify must use the Microsoft Store source.'
     Assert-True ($script:packageSources['Microsoft.PowerToys'] -eq 'winget') 'PowerToys should use the WinGet source.'
     Assert-True (($script:installed -like 'Microsoft.DotNet.SDK*').Count -eq 0) 'Do not install .NET through WinGet.'
     foreach ($action in @('dotnet10', 'prompt-font', 'wslc', 'node-fnm', 'terminal-font-True')) {
@@ -110,7 +111,7 @@ Test-Case 'Custom exact IDs can be added without restoring default selections' {
 }
 
 Test-Case 'Custom packages can be toggled off' {
-    Mock-Setup -Answers @('none', 'add', '7zip.7zip', '31', '')
+    Mock-Setup -Answers @('none', 'add', '7zip.7zip', '32', '')
     Start-WindowsSetup
     Assert-True ($script:installed.Count -eq 0) 'Deselected custom package was installed.'
 }

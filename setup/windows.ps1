@@ -268,6 +268,7 @@ function Start-WindowsSetup {
         [pscustomobject]@{ Name = 'Microsoft PowerToys'; Id = 'Microsoft.PowerToys'; Selected = $true }
         [pscustomobject]@{ Name = 'Audient iD driver + mixer (iD14)'; Id = 'Audient.iD'; Selected = $true }
         [pscustomobject]@{ Name = 'Logi Options+ (Lift mouse)'; Id = 'Logitech.OptionsPlus'; Selected = $true }
+        [pscustomobject]@{ Name = 'Spotify (Microsoft Store)'; Id = '9NCBCSZSJRSB'; Source = 'msstore'; Selected = $true }
     )
 
     Write-Host 'Select your Windows setup. Nothing is installed until you confirm.' -ForegroundColor Cyan
